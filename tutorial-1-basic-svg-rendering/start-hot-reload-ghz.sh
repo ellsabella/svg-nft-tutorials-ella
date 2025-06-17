@@ -1,0 +1,1 @@
+npm --prefix ../ts-tooling run hot-reload ../tutorial-1-basic-svg-rendering/ test/BasicGHZRenderer.t.sol testSvgRenderer 123
