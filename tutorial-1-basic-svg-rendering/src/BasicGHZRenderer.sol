@@ -53,258 +53,6 @@ contract BasicGHZRenderer {
         return "";
     }
 
-    /* === public entry === */
-    function renderSVG(uint256 tokenId) public view returns (string memory) {
-        return createRandomGridSVG(tokenId, getFontData());
-    }
-
-    /* === main builder === */
-    function createRandomGridSVG(
-        uint256 tokenId,
-        string memory base64Font
-    ) internal pure returns (string memory) {
-        uint256 seed = uint256(keccak256(abi.encodePacked(tokenId)));
-
-        /* grid size 6 / 8 / 10 / 12 */
-        uint256 grid = (seed & 3) == 0 ? 6 : (seed & 3) == 1
-            ? 8
-            : (seed & 3) == 2
-            ? 10
-            : 12;
-        uint256 cell = 500 / grid;
-        uint256 fontPx = (cell * 9) / 10; // 90% of cell
-        uint256 off = (500 - cell * grid) / 2;
-        uint256 q = grid / 2; // quarter used for mirroring
-
-        /* build header + defs (re‑derive params inside to save stack) */
-        uint256 pitch = 2 + ((seed >> 56) & 7);
-        string memory header = createSVGHeader(base64Font, fontPx, pitch, seed);
-
-        /* choose main artistic filter */
-        uint256 a = (seed >> 60) & 3;
-        string memory mainF = a == 0 ? "glitchF" : a == 1
-            ? "neonF"
-            : "channelF";
-
-        /* optional scanline overlay */
-        string memory scan = "";
-        uint256 sc = (seed >> 64) & 3;
-        if (sc != 0) {
-            scan = string.concat(
-                '<rect width="500" height="500" fill="url(#',
-                sc == 1 ? "scanG" : "scanP",
-                ')" opacity="0.08"/>'
-            );
-        }
-
-        /* quarter grid letters then mirror */
-        string memory qSVG = generateQuarterLetters(seed, q, cell, off);
-        string memory mirrored = string.concat(
-            '<g id="q">',
-            qSVG,
-            "</g>",
-            '<use href="#q"/>',
-            '<use href="#q" transform="scale(-1,1) translate(-500,0)"/>',
-            '<use href="#q" transform="scale(1,-1) translate(0,-500)"/>',
-            '<use href="#q" transform="scale(-1,-1) translate(-500,-500)"/>'
-        );
-
-        return
-            string.concat(
-                header,
-                scan,
-                '<g filter="url(#',
-                mainF,
-                ')">',
-                mirrored,
-                "</g></svg>"
-            );
-    }
-
-    /* === header & defs === */
-    function createSVGHeader(
-        string memory base64Font,
-        uint256 fontSize,
-        uint256 pitch,
-        uint256 seed
-    ) internal pure returns (string memory) {
-        string
-            memory svgStart = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500"><rect width="500" height="500" fill="black"/>';
-
-        string memory fontFace = bytes(base64Font).length > 0
-            ? string.concat(
-                '@font-face{font-family:"geom2regular";src:url(data:application/font-woff2;base64,',
-                base64Font,
-                ') format("woff2");}'
-            )
-            : "";
-
-        // palette + filter params derived locally (no extra stack at caller)
-        (string memory c0, string memory c1, string memory c2) = pickPalette(
-            seed
-        );
-        uint256 dScale = 4 + ((seed >> 32) & 0xF);
-        uint256 blurPx = 1 + ((seed >> 40) & 3);
-        int256 dxRGB = int256(int8(int((seed >> 48) % 5) - 2));
-        string memory dxStr = intToString(dxRGB);
-
-        // <style>
-        string memory style = string.concat(
-            "<style>",
-            fontFace,
-            "@keyframes p{to{stroke-dashoffset:0}}",
-            ".letter{fill:none;stroke-width:1;stroke-linecap:round;stroke-dasharray:50;stroke-dashoffset:50;font-family:geom2regular,monospace;font-size:",
-            toString(fontSize),
-            "px;}",
-            ".c0{stroke:",
-            c0,
-            ";}.c1{stroke:",
-            c1,
-            ";}.c2{stroke:",
-            c2,
-            ";}",
-            "</style>"
-        );
-
-        // scanline pattern (green)
-        string memory scanG = string.concat(
-            '<pattern id="scanG" width="4" height="',
-            toString(pitch),
-            '" patternUnits="userSpaceOnUse">',
-            '<rect width="4" height="1" fill="#00ff00"/>',
-            '<animateTransform attributeName="patternTransform" type="translate" from="0 0" to="0 ',
-            toString(pitch),
-            '" dur="0.4s" repeatCount="indefinite"/>',
-            "</pattern>"
-        );
-
-        // assemble <defs>
-        string memory defs = string.concat(
-            "<defs>",
-            style,
-            scanG,
-            '<pattern id="scanP" width="4" height="4" patternUnits="userSpaceOnUse"><rect width="4" height="1" fill="#ff00ff"/></pattern>',
-            '<filter id="glitchF" x="-20%" y="-20%" width="140%" height="140%">',
-            '<feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="1" seed="2" result="t"/>',
-            '<feDisplacementMap in="SourceGraphic" in2="t" scale="',
-            toString(dScale),
-            '" xChannelSelector="R" yChannelSelector="G"/>',
-            "</filter>",
-            '<filter id="neonF" x="-20%" y="-20%" width="140%" height="140%">',
-            '<feGaussianBlur stdDeviation="',
-            toString(blurPx),
-            '" result="b"/>',
-            '<feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>',
-            "</filter>",
-            '<filter id="channelF" x="-20%" y="-20%" width="140%" height="140%" color-interpolation-filters="sRGB">',
-            '<feOffset dx="',
-            dxStr,
-            '" dy="0" result="r"/>',
-            '<feComponentTransfer in="r">',
-            '<feFuncR type="linear" slope="1"/>',
-            '<feFuncG type="linear" slope="0"/>',
-            '<feFuncB type="linear" slope="0"/>',
-            '<feFuncA type="linear" slope="1"/>',
-            "</feComponentTransfer>",
-            '<feMerge><feMergeNode in="SourceGraphic"/><feMergeNode in="r"/></feMerge>',
-            "</filter>",
-            "</defs>"
-        );
-
-        return string.concat(svgStart, defs);
-    }
-
-    /* === quarter letters === */
-    function generateQuarterLetters(
-        uint256 seed,
-        uint256 q,
-        uint256 cell,
-        uint256 off
-    ) internal pure returns (string memory out) {
-        for (uint256 r; r < q; r++) {
-            for (uint256 c; c < q; c++) {
-                seed = uint256(keccak256(abi.encodePacked(seed, r, c)));
-                if (seed % 100 < 60) {
-                    out = string.concat(
-                        out,
-                        buildLetter(seed, c, r, cell, off)
-                    );
-                }
-            }
-        }
-    }
-
-    /* === single glyph === */
-    function buildLetter(
-        uint256 s,
-        uint256 col,
-        uint256 row,
-        uint256 cell,
-        uint256 off
-    ) internal pure returns (string memory) {
-        uint256 x = col * cell + off + cell / 2;
-        uint256 y = row * cell + off + cell / 2;
-        string memory glyph = s % 3 == 0 ? "G" : s % 3 == 1 ? "H" : "Z";
-        string memory cls = ((s >> 8) % 3) == 0 ? "c0" : ((s >> 8) % 3) == 1
-            ? "c1"
-            : "c2";
-        uint256 dur = 1 + ((s >> 16) % 3);
-        uint256 delay = (s >> 24) % 10;
-
-        return
-            string.concat(
-                '<text class="letter ',
-                cls,
-                '" x="',
-                toString(x),
-                '" y="',
-                toString(y),
-                '" style="animation:p 2s linear infinite">',
-                '<animate attributeName="opacity" values="1;0.2;1" dur="',
-                toString(dur),
-                's" begin="0.',
-                toString(delay),
-                's" repeatCount="indefinite"/>',
-                glyph,
-                "</text>"
-            );
-    }
-
-    /* === palette === */
-    function pickPalette(
-        uint256 s
-    ) internal pure returns (string memory, string memory, string memory) {
-        uint256 i = (s >> 4) % 3;
-        if (i == 0) return ("#ff00ff", "#00ffff", "#ffff00");
-        if (i == 1) return ("#ff0000", "#00ff00", "#0000ff");
-        return ("#ffff00", "#00ffff", "#00ff00");
-    }
-
-    /* === helpers === */
-    function toString(uint256 v) internal pure returns (string memory) {
-        if (v == 0) return "0";
-        uint256 l = v;
-        uint256 digits;
-        while (l != 0) {
-            digits++;
-            l /= 10;
-        }
-        bytes memory buf = new bytes(digits);
-        while (v != 0) {
-            digits--;
-            buf[digits] = bytes1(uint8(48 + (v % 10)));
-            v /= 10;
-        }
-        return string(buf);
-    }
-
-    function intToString(int256 i) internal pure returns (string memory) {
-        return
-            i >= 0
-                ? toString(uint256(i))
-                : string.concat("-", toString(uint256(-i)));
-    }
-
     // Helper function to test if font file exists locally
     function localFontExists() external pure returns (bool) {
         return bytes(LOCAL_FONT_DATA).length > 0;
@@ -379,5 +127,367 @@ contract BasicGHZRenderer {
                 '<text font-family="serif" font-size="20" x="250" y="250" fill="white" text-anchor="middle">GHZ</text>',
                 "</svg>"
             );
+    }
+
+    /* ============================================================= */
+    /*      PLAIN BLACK BACKGROUND  ·  12×12 GRID  ·  CLIP MASK       */
+    /* ============================================================= */
+
+    function renderSVG(uint256 tokenId) public view returns (string memory) {
+        return _build(tokenId, getFontData());
+    }
+
+    /* ===== core builder (≤9 locals) ===== */
+    function _build(
+        uint256 id,
+        string memory font
+    ) internal pure returns (string memory) {
+        uint256 seed = uint256(keccak256(abi.encodePacked(id)));
+        (string memory A, string memory B, string memory C) = _palette(seed);
+
+        // two shapes with inline colour pick
+        string memory s1 = _shape(seed, _pickColour(seed, A, B, C));
+        string memory s2 = _shape(seed >> 1, _pickColour(seed >> 1, A, B, C));
+
+        // letter groups
+        (string memory col, string memory plain) = _letters(seed, A, B, C);
+
+        // defs (clips, grain, style)
+        string memory defs = _defs(s1, s2, seed, font);
+
+        /* --- assemble SVG --- */
+        return
+            string.concat(
+                '<svg viewBox="0 0 480 480"><rect width="480" height="480" fill="#000"/>',
+                defs,
+                s1,
+                s2,
+                '<g filter="url(#g)">',
+                // coloured everywhere first
+                '<g font-family="g" font-size="32">',
+                col,
+                "</g>",
+                // black inside shape‑1 only
+                '<g clip-path="url(#s1only)" fill="#000" font-family="g" font-size="32">',
+                plain,
+                "</g>",
+                // black inside shape‑2 only
+                '<g clip-path="url(#s2only)" fill="#000" font-family="g" font-size="32">',
+                plain,
+                "</g>",
+                "</g></svg>"
+            );
+    }
+
+    /* ===== defs helper ===== */
+    function _defs(
+        string memory s1,
+        string memory s2,
+        uint256 seed,
+        string memory font
+    ) internal pure returns (string memory) {
+        (string memory A, string memory B, string memory C) = _palette(seed);
+        return
+            string.concat(
+                "<defs>",
+                // subtle grain filter
+                '<filter id="g"><feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="1" result="n"/><feColorMatrix type="saturate" values="0"/><feComponentTransfer><feFuncA type="linear" slope="0.12"/></feComponentTransfer><feBlend in="SourceGraphic" in2="n" mode="multiply"/></filter>',
+                // base shape clips
+                '<clipPath id="s1">',
+                s1,
+                "</clipPath>",
+                '<clipPath id="s2">',
+                s2,
+                "</clipPath>",
+                // s1 only = s1 minus s2 (evenodd order matters)
+                '<clipPath id="s1only" clip-rule="evenodd">',
+                s1,
+                s2,
+                "</clipPath>",
+                // s2 only = s2 minus s1
+                '<clipPath id="s2only" clip-rule="evenodd">',
+                s2,
+                s1,
+                "</clipPath>",
+                // palette + font
+                "<style>",
+                ".a{fill:",
+                A,
+                "}.b{fill:",
+                B,
+                "}.c{fill:",
+                C,
+                "}",
+                bytes(font).length > 0
+                    ? string.concat(
+                        "@font-face{font-family:g;src:url(data:application/font-woff2;base64,",
+                        font,
+                        ') format("woff2");}'
+                    )
+                    : "",
+                "</style>",
+                "</defs>"
+            );
+    }
+
+    /* ===== letters ===== */
+    function _letters(
+        uint256 seed,
+        string memory A,
+        string memory B,
+        string memory C
+    ) internal pure returns (string memory col, string memory plain) {
+        for (uint256 r; r < 12; r++) {
+            for (uint256 c; c < 12; c++) {
+                seed = uint256(keccak256(abi.encodePacked(seed, r, c)));
+                if (seed % 100 < 30) {
+                    string memory x = uint2str(c * 40 + 20);
+                    string memory y = uint2str(r * 40 + 20);
+                    string memory L = seed % 3 == 0 ? "G" : seed % 3 == 1
+                        ? "H"
+                        : "Z";
+                    string memory cls = (seed >> 8) % 3 == 0
+                        ? "a"
+                        : (seed >> 8) % 3 == 1
+                        ? "b"
+                        : "c";
+                    col = string.concat(
+                        col,
+                        "<text class=",
+                        cls,
+                        " x=",
+                        x,
+                        " y=",
+                        y,
+                        ">",
+                        L,
+                        "</text>"
+                    );
+                    plain = string.concat(
+                        plain,
+                        "<text x=",
+                        x,
+                        " y=",
+                        y,
+                        ">",
+                        L,
+                        "</text>"
+                    );
+                }
+            }
+        }
+    }
+
+    /* ===== colour picker ===== */
+    function _pickColour(
+        uint256 s,
+        string memory A,
+        string memory B,
+        string memory C
+    ) internal pure returns (string memory) {
+        uint256 i = (s >> 160) % 3;
+        return i == 0 ? A : i == 1 ? B : C;
+    }
+
+    /* ===== shape builder ===== */
+    function _shape(
+        uint256 s,
+        string memory fill
+    ) internal pure returns (string memory) {
+        uint256 rSeed = s >> 96; // for positions
+        if ((s & 7) != 0) {
+            uint256 r = 120 + (s % 120);
+            uint256 cx = 40 + ((rSeed >> 16) % 400);
+            uint256 cy = 40 + ((rSeed >> 32) % 400);
+            return
+                string.concat(
+                    "<circle cx=",
+                    uint2str(cx),
+                    " cy=",
+                    uint2str(cy),
+                    " r=",
+                    uint2str(r),
+                    ' fill="',
+                    fill,
+                    '"/>'
+                );
+        }
+        uint256 sz = 240 + (s % 120);
+        uint256 max = 480 - sz;
+        uint256 x0 = (rSeed >> 48) % max;
+        return
+            string.concat(
+                "<rect x=",
+                uint2str(x0),
+                " y=",
+                uint2str(x0),
+                " width=",
+                uint2str(sz),
+                " height=",
+                uint2str(sz),
+                ' fill="',
+                fill,
+                '"/>'
+            );
+    }
+
+    // /* -------- core builder -------- */
+    // function _build(
+    //     uint256 id,
+    //     string memory font
+    // ) internal pure returns (string memory) {
+    //     uint256 seed = uint256(keccak256(abi.encodePacked(id)));
+    //     (string memory c0, string memory c1, string memory c2) = _palette(seed);
+    //     string[3] memory cols = [c0, c1, c2];
+
+    //     string memory bigShape = _shape(seed, cols);
+    //     string memory lettersCol = _letters(seed, cols, true); // coloured
+    //     string memory lettersPlain = _letters(seed, cols, false); // no fill
+
+    //     /* SVG header + defs */
+    //     string memory head = string.concat(
+    //         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 480">',
+    //         '<rect width="480" height="480" fill="black"/>',
+    //         '<defs><clipPath id="cut">',
+    //         bigShape,
+    //         "</clipPath></defs>",
+    //         bytes(font).length > 0
+    //             ? string.concat(
+    //                 "<style>@font-face{font-family:geom;src:url(data:application/font-woff2;base64,",
+    //                 font,
+    //                 ') format("woff2");}</style>'
+    //             )
+    //             : ""
+    //     );
+
+    //     /* paint order: bg → shape → coloured letters → black-clipped letters */
+    //     return
+    //         string.concat(
+    //             head,
+    //             bigShape,
+    //             '<g font-family="geom,monospace" font-size="32" text-anchor="middle" dominant-baseline="middle">',
+    //             lettersCol,
+    //             "</g>",
+    //             '<g clip-path="url(#cut)" fill="black" font-family="geom,monospace" font-size="32" text-anchor="middle" dominant-baseline="middle">',
+    //             lettersPlain,
+    //             "</g>",
+    //             "</svg>"
+    //         );
+    // }
+
+    // /* -------- letters builder (flag: withColour) -------- */
+    // function _letters(
+    //     uint256 seed,
+    //     string[3] memory cols,
+    //     bool colour
+    // ) internal pure returns (string memory out) {
+    //     uint256 cell = 40;
+    //     uint256 off = 20; // 12×12 grid
+    //     string[3] memory glyph = ["G", "H", "Z"];
+
+    //     for (uint256 r; r < 12; r++) {
+    //         for (uint256 c; c < 12; c++) {
+    //             seed = uint256(keccak256(abi.encodePacked(seed, r, c)));
+    //             if (seed % 100 < 30) {
+    //                 uint256 x = c * cell + off;
+    //                 uint256 y = r * cell + off;
+    //                 uint256 g = seed % 3;
+    //                 if (colour) {
+    //                     uint256 col = (seed >> 8) % 3;
+    //                     out = string.concat(
+    //                         out,
+    //                         '<text fill="',
+    //                         cols[col],
+    //                         '" x="',
+    //                         uint2str(x),
+    //                         '" y="',
+    //                         uint2str(y),
+    //                         '">',
+    //                         glyph[g],
+    //                         "</text>"
+    //                     );
+    //                 } else {
+    //                     out = string.concat(
+    //                         out,
+    //                         '<text x="',
+    //                         uint2str(x),
+    //                         '" y="',
+    //                         uint2str(y),
+    //                         '">',
+    //                         glyph[g],
+    //                         "</text>"
+    //                     );
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
+
+    // /* -------- big random shape -------- */
+    // function _shape(
+    //     uint256 s,
+    //     string[3] memory cols
+    // ) internal pure returns (string memory) {
+    //     string memory fill = cols[(s >> 160) % 3];
+    //     if (((s >> 8) & 1) == 0) {
+    //         uint256 r = 120 + (s % 120);
+    //         return
+    //             string.concat(
+    //                 '<circle cx="240" cy="240" r="',
+    //                 uint2str(r),
+    //                 '" fill="',
+    //                 fill,
+    //                 '"/>'
+    //             );
+    //     } else {
+    //         uint256 sz = 240 + (s % 120);
+    //         uint256 x = 240 - sz / 2;
+    //         return
+    //             string.concat(
+    //                 '<rect x="',
+    //                 uint2str(x),
+    //                 '" y="',
+    //                 uint2str(x),
+    //                 '" width="',
+    //                 uint2str(sz),
+    //                 '" height="',
+    //                 uint2str(sz),
+    //                 '" fill="',
+    //                 fill,
+    //                 '"/>'
+    //             );
+    //     }
+    // }
+
+    /* ===== palette ===== */
+    function _palette(
+        uint256 s
+    ) internal pure returns (string memory, string memory, string memory) {
+        uint256 i = (s >> 4) % 3;
+        if (i == 0) return ("#f0f", "#0ff", "#ff0");
+        if (i == 1) return ("#f00", "#0f0", "#00f");
+        return ("#ff0", "#0ff", "#0f0");
+    }
+
+    /* ---------- helpers ---------- */
+    function uint2str(uint256 v) internal pure returns (string memory) {
+        if (v == 0) return "0";
+        uint256 digits;
+        uint256 tmp = v;
+        while (tmp != 0) {
+            digits++;
+            tmp /= 10;
+        }
+        bytes memory buf = new bytes(digits);
+        while (v != 0) {
+            digits--;
+            buf[digits] = bytes1(uint8(48 + (v % 10)));
+            v /= 10;
+        }
+        return string(buf);
+    }
+
+    function toString(uint256 v) internal pure returns (string memory) {
+        return uint2str(v);
     }
 }
