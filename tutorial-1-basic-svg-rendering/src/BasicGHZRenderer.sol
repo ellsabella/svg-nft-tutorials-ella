@@ -162,6 +162,8 @@ contract BasicGHZRenderer {
                 defs,
                 s1,
                 s2,
+                // black overlap patch
+                '<rect width="480" height="480" fill="#000" clip-path="url(#inter)"/>',
                 '<g filter="url(#g)">',
                 // coloured everywhere first
                 '<g font-family="g" font-size="32">',
@@ -190,8 +192,6 @@ contract BasicGHZRenderer {
         return
             string.concat(
                 "<defs>",
-                // subtle grain filter
-                '<filter id="g"><feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="1" result="n"/><feColorMatrix type="saturate" values="0"/><feComponentTransfer><feFuncA type="linear" slope="0.12"/></feComponentTransfer><feBlend in="SourceGraphic" in2="n" mode="multiply"/></filter>',
                 // base shape clips
                 '<clipPath id="s1">',
                 s1,
@@ -199,16 +199,18 @@ contract BasicGHZRenderer {
                 '<clipPath id="s2">',
                 s2,
                 "</clipPath>",
-                // s1 only = s1 minus s2 (evenodd order matters)
+                // s1 only = s1 − s2
                 '<clipPath id="s1only" clip-rule="evenodd">',
                 s1,
                 s2,
                 "</clipPath>",
-                // s2 only = s2 minus s1
+                // s2 only = s2 − s1
                 '<clipPath id="s2only" clip-rule="evenodd">',
                 s2,
                 s1,
                 "</clipPath>",
+                // intersection = s1 ∩ s2 (nested clip path, works for patch)
+                '<clipPath id="inter"><g clip-path="url(#s1)"><use href="#s2"/></g></clipPath>',
                 // palette + font
                 "<style>",
                 ".a{fill:",
@@ -296,7 +298,7 @@ contract BasicGHZRenderer {
     ) internal pure returns (string memory) {
         uint256 rSeed = s >> 96; // for positions
         if ((s & 7) != 0) {
-            uint256 r = 120 + (s % 120);
+            uint256 r = 60 + (s % 120);
             uint256 cx = 40 + ((rSeed >> 16) % 400);
             uint256 cy = 40 + ((rSeed >> 32) % 400);
             return
@@ -312,7 +314,7 @@ contract BasicGHZRenderer {
                     '"/>'
                 );
         }
-        uint256 sz = 240 + (s % 120);
+        uint256 sz = 120 + (s % 120);
         uint256 max = 480 - sz;
         uint256 x0 = (rSeed >> 48) % max;
         return
@@ -330,134 +332,6 @@ contract BasicGHZRenderer {
                 '"/>'
             );
     }
-
-    // /* -------- core builder -------- */
-    // function _build(
-    //     uint256 id,
-    //     string memory font
-    // ) internal pure returns (string memory) {
-    //     uint256 seed = uint256(keccak256(abi.encodePacked(id)));
-    //     (string memory c0, string memory c1, string memory c2) = _palette(seed);
-    //     string[3] memory cols = [c0, c1, c2];
-
-    //     string memory bigShape = _shape(seed, cols);
-    //     string memory lettersCol = _letters(seed, cols, true); // coloured
-    //     string memory lettersPlain = _letters(seed, cols, false); // no fill
-
-    //     /* SVG header + defs */
-    //     string memory head = string.concat(
-    //         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 480">',
-    //         '<rect width="480" height="480" fill="black"/>',
-    //         '<defs><clipPath id="cut">',
-    //         bigShape,
-    //         "</clipPath></defs>",
-    //         bytes(font).length > 0
-    //             ? string.concat(
-    //                 "<style>@font-face{font-family:geom;src:url(data:application/font-woff2;base64,",
-    //                 font,
-    //                 ') format("woff2");}</style>'
-    //             )
-    //             : ""
-    //     );
-
-    //     /* paint order: bg → shape → coloured letters → black-clipped letters */
-    //     return
-    //         string.concat(
-    //             head,
-    //             bigShape,
-    //             '<g font-family="geom,monospace" font-size="32" text-anchor="middle" dominant-baseline="middle">',
-    //             lettersCol,
-    //             "</g>",
-    //             '<g clip-path="url(#cut)" fill="black" font-family="geom,monospace" font-size="32" text-anchor="middle" dominant-baseline="middle">',
-    //             lettersPlain,
-    //             "</g>",
-    //             "</svg>"
-    //         );
-    // }
-
-    // /* -------- letters builder (flag: withColour) -------- */
-    // function _letters(
-    //     uint256 seed,
-    //     string[3] memory cols,
-    //     bool colour
-    // ) internal pure returns (string memory out) {
-    //     uint256 cell = 40;
-    //     uint256 off = 20; // 12×12 grid
-    //     string[3] memory glyph = ["G", "H", "Z"];
-
-    //     for (uint256 r; r < 12; r++) {
-    //         for (uint256 c; c < 12; c++) {
-    //             seed = uint256(keccak256(abi.encodePacked(seed, r, c)));
-    //             if (seed % 100 < 30) {
-    //                 uint256 x = c * cell + off;
-    //                 uint256 y = r * cell + off;
-    //                 uint256 g = seed % 3;
-    //                 if (colour) {
-    //                     uint256 col = (seed >> 8) % 3;
-    //                     out = string.concat(
-    //                         out,
-    //                         '<text fill="',
-    //                         cols[col],
-    //                         '" x="',
-    //                         uint2str(x),
-    //                         '" y="',
-    //                         uint2str(y),
-    //                         '">',
-    //                         glyph[g],
-    //                         "</text>"
-    //                     );
-    //                 } else {
-    //                     out = string.concat(
-    //                         out,
-    //                         '<text x="',
-    //                         uint2str(x),
-    //                         '" y="',
-    //                         uint2str(y),
-    //                         '">',
-    //                         glyph[g],
-    //                         "</text>"
-    //                     );
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
-
-    // /* -------- big random shape -------- */
-    // function _shape(
-    //     uint256 s,
-    //     string[3] memory cols
-    // ) internal pure returns (string memory) {
-    //     string memory fill = cols[(s >> 160) % 3];
-    //     if (((s >> 8) & 1) == 0) {
-    //         uint256 r = 120 + (s % 120);
-    //         return
-    //             string.concat(
-    //                 '<circle cx="240" cy="240" r="',
-    //                 uint2str(r),
-    //                 '" fill="',
-    //                 fill,
-    //                 '"/>'
-    //             );
-    //     } else {
-    //         uint256 sz = 240 + (s % 120);
-    //         uint256 x = 240 - sz / 2;
-    //         return
-    //             string.concat(
-    //                 '<rect x="',
-    //                 uint2str(x),
-    //                 '" y="',
-    //                 uint2str(x),
-    //                 '" width="',
-    //                 uint2str(sz),
-    //                 '" height="',
-    //                 uint2str(sz),
-    //                 '" fill="',
-    //                 fill,
-    //                 '"/>'
-    //             );
-    //     }
-    // }
 
     /* ===== palette ===== */
     function _palette(
