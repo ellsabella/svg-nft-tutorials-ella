@@ -137,6 +137,31 @@ contract BasicGHZRenderer {
         return _build(tokenId, getFontData());
     }
 
+    /* ===== get animation transform ===== */
+    function _getAnimationTransform(
+        uint256 seed
+    ) internal pure returns (string memory) {
+        uint256 moveSeed = seed >> 200;
+        int256 deltaX = int256((moveSeed & 0xFF) % 60) - 30;
+        int256 deltaY = int256(((moveSeed >> 8) & 0xFF) % 60) - 30;
+
+        string memory dx = deltaX >= 0
+            ? uint2str(uint256(deltaX))
+            : string.concat("-", uint2str(uint256(-deltaX)));
+        string memory dy = deltaY >= 0
+            ? uint2str(uint256(deltaY))
+            : string.concat("-", uint2str(uint256(-deltaY)));
+
+        return
+            string.concat(
+                '<animateTransform attributeName="transform" type="translate" values="0,0;',
+                dx,
+                ",",
+                dy,
+                ';0,0" dur="4s" repeatCount="indefinite"/>'
+            );
+    }
+
     /* ===== core builder (≤9 locals) ===== */
     function _build(
         uint256 id,
@@ -145,15 +170,18 @@ contract BasicGHZRenderer {
         uint256 seed = uint256(keccak256(abi.encodePacked(id)));
         (string memory A, string memory B, string memory C) = _palette(seed);
 
-        // two shapes with inline colour pick
-        string memory s1 = _shape(seed, _pickColour(seed, A, B, C));
-        string memory s2 = _shape(seed >> 1, _pickColour(seed >> 1, A, B, C));
+        // two shapes with inline colour pick and blur filter
+        string memory s1 = _blurShape(seed, _pickColour(seed, A, B, C));
+        string memory s2 = _blurShape(
+            seed >> 1,
+            _pickColour(seed >> 1, A, B, C)
+        );
 
         // letter groups
         (string memory col, string memory plain) = _letters(seed, A, B, C);
 
         // defs (clips, grain, style)
-        string memory defs = _defs(s1, s2, seed, font);
+        string memory defs = _defs(seed, font, A, B, C);
 
         /* --- assemble SVG --- */
         return
@@ -164,18 +192,24 @@ contract BasicGHZRenderer {
                 s2,
                 // black overlap patch
                 '<rect width="480" height="480" fill="#000" clip-path="url(#inter)"/>',
-                '<g filter="url(#g)">',
+                '<g filter="url(#textGlow)">',
                 // coloured everywhere first
                 '<g font-family="g" font-size="32">',
                 col,
                 "</g>",
-                // black inside shape‑1 only
+                // black inside shape‑1 only - counter-animate to follow shape movement
                 '<g clip-path="url(#s1only)" fill="#000" font-family="g" font-size="32">',
+                "<g>",
+                _getAnimationTransform(seed),
                 plain,
                 "</g>",
-                // black inside shape‑2 only
+                "</g>",
+                // black inside shape‑2 only - counter-animate to follow shape movement
                 '<g clip-path="url(#s2only)" fill="#000" font-family="g" font-size="32">',
+                "<g>",
+                _getAnimationTransform(seed >> 1),
                 plain,
+                "</g>",
                 "</g>",
                 "</g></svg>"
             );
@@ -183,33 +217,48 @@ contract BasicGHZRenderer {
 
     /* ===== defs helper ===== */
     function _defs(
-        string memory s1,
-        string memory s2,
         uint256 seed,
-        string memory font
+        string memory font,
+        string memory A,
+        string memory B,
+        string memory C
     ) internal pure returns (string memory) {
-        (string memory A, string memory B, string memory C) = _palette(seed);
         return
             string.concat(
                 "<defs>",
-                // base shape clips
+                // blur shine filter for shapes
+                '<filter id="blur" x="-50%" y="-50%" width="200%" height="200%">',
+                '<feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur"/>',
+                '<feColorMatrix in="blur" type="matrix" values="3 0 0 0 0.5 0 3 0 0 0.5 0 0 3 0 0.5 0 0 0 1 0"/>',
+                '<feGaussianBlur stdDeviation="12" result="glow"/>',
+                '<feColorMatrix in="glow" type="saturate" values="2"/>',
+                '<feMerge><feMergeNode in="glow"/><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>',
+                "</filter>",
+                // text glow filter
+                '<filter id="textGlow" x="-50%" y="-50%" width="200%" height="200%">',
+                '<feGaussianBlur in="SourceGraphic" stdDeviation="1.5" result="blur"/>',
+                '<feColorMatrix in="blur" type="matrix" values="1.3 0 0 0 0.2 0 1.3 0 0 0.2 0 0 1.3 0 0.2 0 0 0 1 0"/>',
+                '<feGaussianBlur stdDeviation="4" result="glow"/>',
+                '<feMerge><feMergeNode in="glow"/><feMergeNode in="SourceGraphic"/></feMerge>',
+                "</filter>",
+                // static base shape clips (no animation)
                 '<clipPath id="s1">',
-                s1,
+                _shape(seed, _pickColour(seed, A, B, C)),
                 "</clipPath>",
                 '<clipPath id="s2">',
-                s2,
+                _shape(seed >> 1, _pickColour(seed >> 1, A, B, C)),
                 "</clipPath>",
                 // s1 only = s1 − s2
                 '<clipPath id="s1only" clip-rule="evenodd">',
-                s1,
-                s2,
+                _shape(seed, _pickColour(seed, A, B, C)),
+                _shape(seed >> 1, _pickColour(seed >> 1, A, B, C)),
                 "</clipPath>",
                 // s2 only = s2 − s1
                 '<clipPath id="s2only" clip-rule="evenodd">',
-                s2,
-                s1,
+                _shape(seed >> 1, _pickColour(seed >> 1, A, B, C)),
+                _shape(seed, _pickColour(seed, A, B, C)),
                 "</clipPath>",
-                // intersection = s1 ∩ s2 (nested clip path, works for patch)
+                // intersection = s1 ∩ s2
                 '<clipPath id="inter"><g clip-path="url(#s1)"><use href="#s2"/></g></clipPath>',
                 // palette + font
                 "<style>",
@@ -229,6 +278,39 @@ contract BasicGHZRenderer {
                     : "",
                 "</style>",
                 "</defs>"
+            );
+    }
+
+    /* ===== blur shape builder ===== */
+    function _blurShape(
+        uint256 s,
+        string memory fill
+    ) internal pure returns (string memory) {
+        string memory shape = _shape(s, fill);
+
+        // generate random movement direction from seed
+        uint256 moveSeed = s >> 200;
+        int256 deltaX = int256((moveSeed & 0xFF) % 60) - 30; // -30 to +29
+        int256 deltaY = int256(((moveSeed >> 8) & 0xFF) % 60) - 30; // -30 to +29
+
+        string memory dx = deltaX >= 0
+            ? uint2str(uint256(deltaX))
+            : string.concat("-", uint2str(uint256(-deltaX)));
+        string memory dy = deltaY >= 0
+            ? uint2str(uint256(deltaY))
+            : string.concat("-", uint2str(uint256(-deltaY)));
+
+        // wrap the shape with intense glow filter and animation
+        return
+            string.concat(
+                '<g filter="url(#blur)">',
+                '<animateTransform attributeName="transform" type="translate" values="0,0;',
+                dx,
+                ",",
+                dy,
+                ';0,0" dur="4s" repeatCount="indefinite"/>',
+                shape,
+                "</g>"
             );
     }
 
@@ -338,9 +420,9 @@ contract BasicGHZRenderer {
         uint256 s
     ) internal pure returns (string memory, string memory, string memory) {
         uint256 i = (s >> 4) % 3;
-        if (i == 0) return ("#f0f", "#0ff", "#ff0");
-        if (i == 1) return ("#f00", "#0f0", "#00f");
-        return ("#ff0", "#0ff", "#0f0");
+        if (i == 0) return ("#7BDFF2", "#FCFCB1", "#FBACBE");
+        if (i == 1) return ("#FBACBE", "#FCFCB1", "#7BDFF2");
+        return ("#5EC2B7", "#FCFCB1", "#EF6F6C");
     }
 
     /* ---------- helpers ---------- */
