@@ -1,0 +1,12 @@
+[submodule "tutorial-1-basic-svg-rendering/lib/solady"]
+	path = tutorial-1-basic-svg-rendering/lib/solady
+	url = https://github.com/vectorized/solady
+[submodule "tutorial-1-basic-svg-rendering/lib/optimism"]
+	path = tutorial-1-basic-svg-rendering/lib/optimism
+	url = https://github.com/ethereum-optimism/optimism
+[submodule "tutorial-1-basic-svg-rendering/lib/openzeppelin-contracts"]
+	path = tutorial-1-basic-svg-rendering/lib/openzeppelin-contracts
+	url = https://github.com/openzeppelin/openzeppelin-contracts
+[submodule "tutorial-1-basic-svg-rendering/lib/inflate-sol"]
+	path = tutorial-1-basic-svg-rendering/lib/inflate-sol
+	url = https://github.com/adlerjohn/inflate-sol
