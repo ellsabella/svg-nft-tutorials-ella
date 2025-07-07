@@ -6,7 +6,8 @@ import {UploadTspansDef} from "../src/UploadTspansDef.sol";
 import {OnChainArt} from "../src/OnChainArt.sol";
 import {ShapeFactory, IShapeRenderer, CircleRenderer, DiamondRenderer, SquareDiamondRenderer, CrossSquareRenderer} from "../src/ShapeFactory.sol";
 import {ASCIIGenerator} from "../src/ASCIIGenerator.sol";
-import {NeonEffects} from "../src/NeonEffects.sol"; // ADD THIS
+import {NeonEffects} from "../src/NeonEffects.sol";
+import {Animations} from "../src/Animations.sol";
 
 contract OnChainArtTest is AbstractTest {
     OnChainArt public renderer;
@@ -14,11 +15,13 @@ contract OnChainArtTest is AbstractTest {
     ShapeFactory public shapeFactory;
     ASCIIGenerator public asciiGenerator;
     NeonEffects public neonEffects; // ADD THIS
+    Animations public animations; // Optional: If you want to test animations
 
     function setUp() public {
         // 1. Deploy all modules
         asciiGenerator = new ASCIIGenerator();
         neonEffects = new NeonEffects(); // ADD THIS
+        animations = new Animations(); // Optional: If you want to test animations
         shapeFactory = new ShapeFactory();
 
         // 2. Register shape renderers
@@ -36,7 +39,8 @@ contract OnChainArtTest is AbstractTest {
         renderer = new OnChainArt(
             address(shapeFactory),
             address(asciiGenerator),
-            address(neonEffects) // ADD THIS
+            address(neonEffects), // ADD THIS
+            address(animations) // Optional: If you want to test animations
         );
 
         // 4. Deploy uploader

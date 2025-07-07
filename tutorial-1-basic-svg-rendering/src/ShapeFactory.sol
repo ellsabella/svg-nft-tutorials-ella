@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+
 pragma solidity ^0.8.26;
 
 import {Random, RandomCtx} from "./utils/Random.sol";
@@ -10,7 +11,7 @@ interface IShapeRenderer {
         uint256 y;
         string color;
         uint256 seed;
-        uint256 size; // for future scaling
+        uint256 size; // for dynamic scaling
     }
 
     function renderShape(
@@ -40,49 +41,9 @@ contract ShapeFactory {
         require(renderer != address(0), "Shape type not found");
         return IShapeRenderer(renderer).renderShape(params);
     }
-
-    // Adapted from your original _generateOptimizedShapes
-    function generateShapes(
-        uint256 tokenId,
-        uint256 count
-    ) external view returns (string memory) {
-        RandomCtx memory ctx = Random.initCtx(tokenId + 12345);
-        string memory result = "";
-
-        for (uint256 i; i < count; ++i) {
-            uint256 shapeType = Random.randInt(ctx) % shapeTypeCount;
-            if (shapeTypeCount == 0) break; // Safety check
-
-            IShapeRenderer.ShapeParams memory params = IShapeRenderer
-                .ShapeParams({
-                    x: 80 + (Random.randInt(ctx) % 1280),
-                    y: 80 + (Random.randInt(ctx) % 1280),
-                    color: _getLockedShapeColor(shapeType),
-                    seed: Random.randInt(ctx),
-                    size: 60 // Standard size for now
-                });
-
-            result = string(
-                abi.encodePacked(result, this.renderShape(shapeType, params))
-            );
-        }
-
-        return result;
-    }
-
-    // Adapted from your original color mapping
-    function _getLockedShapeColor(
-        uint256 shapeType
-    ) internal pure returns (string memory) {
-        if (shapeType == 0) return "#FF0000"; // Circle: Red
-        if (shapeType == 1) return "#00FFFF"; // Diamond: Cyan
-        if (shapeType == 2) return "#00FF00"; // Square+Diamond: Green
-        if (shapeType == 3) return "#FF00FF"; // Cross Square: Pink
-        return "#FFFF00"; // Default: Yellow for future shapes
-    }
 }
 
-// CircleRenderer
+// CircleRenderer - Simplified to avoid stack depth
 contract CircleRenderer is IShapeRenderer {
     function renderShape(
         ShapeParams memory params
@@ -94,11 +55,20 @@ contract CircleRenderer is IShapeRenderer {
                     Strings.toString(params.x),
                     '" cy="',
                     Strings.toString(params.y),
-                    '" r="60" fill="none" stroke="',
+                    '" r="',
+                    Strings.toString(params.size),
+                    '" fill="none" stroke="',
                     params.color,
-                    '" stroke-width="4"/>'
+                    '" stroke-width="',
+                    Strings.toString(_getStroke(params.size)),
+                    '"/>'
                 )
             );
+    }
+
+    function _getStroke(uint256 size) private pure returns (uint256) {
+        uint256 stroke = (size * 8) / 80;
+        return stroke < 3 ? 3 : (stroke > 8 ? 8 : stroke);
     }
 
     function getShapeId() external pure override returns (string memory) {
@@ -106,40 +76,49 @@ contract CircleRenderer is IShapeRenderer {
     }
 }
 
-// DiamondRenderer - adapted from your buildDiamond
+// DiamondRenderer - Simplified
 contract DiamondRenderer is IShapeRenderer {
     function renderShape(
         ShapeParams memory params
     ) external pure override returns (string memory) {
-        string memory transform = string(
-            abi.encodePacked(
-                '<g transform="translate(',
-                Strings.toString(params.x),
-                ",",
-                Strings.toString(params.y),
-                ") rotate(",
-                _intToString(int256((params.seed % 61)) - 30),
-                ')">'
-            )
-        );
-
         return
             string(
                 abi.encodePacked(
-                    transform,
-                    '<polygon points="0,-25 50,0 0,25 -50,0" fill="none" stroke="',
+                    '<g transform="translate(',
+                    Strings.toString(params.x),
+                    ",",
+                    Strings.toString(params.y),
+                    ") rotate(",
+                    _getRotation(params.seed),
+                    ')">',
+                    '<polygon points="0,-',
+                    Strings.toString(params.size / 4),
+                    " ",
+                    Strings.toString(params.size / 2),
+                    ",0 0,",
+                    Strings.toString(params.size / 4),
+                    " -",
+                    Strings.toString(params.size / 2),
+                    ',0" fill="none" stroke="',
                     params.color,
-                    '" stroke-width="4"/></g>'
+                    '" stroke-width="',
+                    Strings.toString(_getStroke(params.size)),
+                    '"/></g>'
                 )
             );
     }
 
-    function getShapeId() external pure returns (string memory) {
-        return "diamond";
+    function _getStroke(uint256 size) private pure returns (uint256) {
+        uint256 stroke = (size * 4) / 60;
+        return stroke < 2 ? 2 : (stroke > 6 ? 6 : stroke);
     }
 
-    // Helper function from your original contract
-    function _intToString(int256 value) internal pure returns (string memory) {
+    function _getRotation(uint256 seed) private pure returns (string memory) {
+        int256 rotation = int256((seed % 61)) - 30;
+        return _intToString(rotation);
+    }
+
+    function _intToString(int256 value) private pure returns (string memory) {
         if (value == 0) return "0";
 
         bool negative = value < 0;
@@ -163,45 +142,75 @@ contract DiamondRenderer is IShapeRenderer {
             temp /= 10;
         }
 
-        if (negative) {
-            buffer[0] = "-";
-        }
-
+        if (negative) buffer[0] = "-";
         return string(buffer);
+    }
+
+    function getShapeId() external pure returns (string memory) {
+        return "diamond";
     }
 }
 
-// SquareDiamondRenderer - adapted from your buildSquareDiamond
+// SquareDiamondRenderer - Simplified to reduce variables
 contract SquareDiamondRenderer is IShapeRenderer {
     function renderShape(
         ShapeParams memory params
     ) external pure override returns (string memory) {
-        string memory outer = string(
-            abi.encodePacked(
-                '<g><rect x="',
-                Strings.toString(params.x - 30),
-                '" y="',
-                Strings.toString(params.y - 30),
-                '" width="60" height="60" fill="none" stroke="',
-                params.color,
-                '" stroke-width="4"/>'
-            )
-        );
+        // Calculate once, use immediately
+        return
+            string(
+                abi.encodePacked(
+                    '<g><rect x="',
+                    Strings.toString(params.x - params.size / 2),
+                    '" y="',
+                    Strings.toString(params.y - params.size / 2),
+                    '" width="',
+                    Strings.toString(params.size),
+                    '" height="',
+                    Strings.toString(params.size),
+                    '" fill="none" stroke="',
+                    params.color,
+                    '" stroke-width="',
+                    Strings.toString(_getStroke(params.size)),
+                    '"/>',
+                    _getInnerDiamond(params),
+                    "</g>"
+                )
+            );
+    }
 
-        string memory inner = string(
-            abi.encodePacked(
-                '<g transform="translate(',
-                Strings.toString(params.x),
-                ",",
-                Strings.toString(params.y),
-                ') rotate(45)">',
-                '<rect x="-18" y="-18" width="36" height="36" fill="none" stroke="',
-                params.color,
-                '" stroke-width="4"/></g></g>'
-            )
-        );
+    function _getInnerDiamond(
+        ShapeParams memory params
+    ) private pure returns (string memory) {
+        uint256 innerSize = (params.size * 2) / 3;
+        return
+            string(
+                abi.encodePacked(
+                    '<g transform="translate(',
+                    Strings.toString(params.x),
+                    ",",
+                    Strings.toString(params.y),
+                    ') rotate(45)">',
+                    '<rect x="-',
+                    Strings.toString(innerSize / 2),
+                    '" y="-',
+                    Strings.toString(innerSize / 2),
+                    '" width="',
+                    Strings.toString(innerSize),
+                    '" height="',
+                    Strings.toString(innerSize),
+                    '" fill="none" stroke="',
+                    params.color,
+                    '" stroke-width="',
+                    Strings.toString(_getStroke(params.size)),
+                    '"/></g>'
+                )
+            );
+    }
 
-        return string(abi.encodePacked(outer, inner));
+    function _getStroke(uint256 size) private pure returns (uint256) {
+        uint256 stroke = (size * 4) / 60;
+        return stroke < 2 ? 2 : (stroke > 6 ? 6 : stroke);
     }
 
     function getShapeId() external pure override returns (string memory) {
@@ -209,51 +218,99 @@ contract SquareDiamondRenderer is IShapeRenderer {
     }
 }
 
-// CrossSquareRenderer - your updated diagonal cross version
+// CrossSquareRenderer - Most simplified to avoid stack depth
 contract CrossSquareRenderer is IShapeRenderer {
     function renderShape(
         ShapeParams memory params
     ) external pure override returns (string memory) {
-        string memory square = string(
-            abi.encodePacked(
-                '<rect x="',
-                Strings.toString(params.x - 30),
-                '" y="',
-                Strings.toString(params.y - 30),
-                '" width="60" height="60" fill="none" stroke="',
-                params.color,
-                '" stroke-width="4"/>'
-            )
-        );
+        return
+            string(
+                abi.encodePacked(
+                    "<g>",
+                    _getSquare(params),
+                    _getDiagonals(params),
+                    "</g>"
+                )
+            );
+    }
 
-        string memory diagonals = string(
-            abi.encodePacked(
-                '<line x1="',
-                Strings.toString(params.x - 30),
-                '" y1="',
-                Strings.toString(params.y - 30),
-                '" x2="',
-                Strings.toString(params.x + 30),
-                '" y2="',
-                Strings.toString(params.y + 30),
-                '" stroke="',
-                params.color,
-                '" stroke-width="4"/>',
-                '<line x1="',
-                Strings.toString(params.x + 30),
-                '" y1="',
-                Strings.toString(params.y - 30),
-                '" x2="',
-                Strings.toString(params.x - 30),
-                '" y2="',
-                Strings.toString(params.y + 30),
-                '" stroke="',
-                params.color,
-                '" stroke-width="4"/>'
-            )
-        );
+    function _getSquare(
+        ShapeParams memory params
+    ) private pure returns (string memory) {
+        return
+            string(
+                abi.encodePacked(
+                    '<rect x="',
+                    Strings.toString(params.x - params.size / 2),
+                    '" y="',
+                    Strings.toString(params.y - params.size / 2),
+                    '" width="',
+                    Strings.toString(params.size),
+                    '" height="',
+                    Strings.toString(params.size),
+                    '" fill="none" stroke="',
+                    params.color,
+                    '" stroke-width="',
+                    Strings.toString(_getStroke(params.size)),
+                    '"/>'
+                )
+            );
+    }
 
-        return string(abi.encodePacked("<g>", square, diagonals, "</g>"));
+    function _getDiagonals(
+        ShapeParams memory params
+    ) private pure returns (string memory) {
+        return
+            string(
+                abi.encodePacked(_getDiagonal1(params), _getDiagonal2(params))
+            );
+    }
+
+    function _getDiagonal1(
+        ShapeParams memory params
+    ) private pure returns (string memory) {
+        return
+            string(
+                abi.encodePacked(
+                    '<line x1="',
+                    Strings.toString(params.x - params.size / 2),
+                    '" y1="',
+                    Strings.toString(params.y - params.size / 2),
+                    '" x2="',
+                    Strings.toString(params.x + params.size / 2),
+                    '" y2="',
+                    Strings.toString(params.y + params.size / 2),
+                    '" stroke="',
+                    params.color,
+                    '" stroke-width="4"/>'
+                )
+            );
+    }
+
+    function _getDiagonal2(
+        ShapeParams memory params
+    ) private pure returns (string memory) {
+        return
+            string(
+                abi.encodePacked(
+                    '<line x1="',
+                    Strings.toString(params.x + params.size / 2),
+                    '" y1="',
+                    Strings.toString(params.y - params.size / 2),
+                    '" x2="',
+                    Strings.toString(params.x - params.size / 2),
+                    '" y2="',
+                    Strings.toString(params.y + params.size / 2),
+                    '" stroke="',
+                    params.color,
+                    '" stroke-width="4"/>'
+                )
+            );
+    }
+
+    function _getStroke(uint256 size) private pure returns (uint256) {
+        uint256 stroke = (size * 4) / 60;
+        return stroke < 2 ? 2 : (stroke > 6 ? 6 : stroke);
     }
 
     function getShapeId() external pure override returns (string memory) {

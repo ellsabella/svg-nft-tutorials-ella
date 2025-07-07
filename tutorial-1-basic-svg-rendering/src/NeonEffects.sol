@@ -5,33 +5,24 @@ import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 interface INeonEffects {
     enum GlowIntensity {
-        LOW,
-        MEDIUM,
-        HIGH,
-        EXTREME,
-        PULSE_SLOW,
-        PULSE_FAST,
-        PULSE_EXTREME
+        STATIC, // Non-pulsing shapes
+        PULSE_SLOW, // 3 second pulse
+        PULSE_FAST, // 1 second pulse
+        PULSE_EXTREME // 2 second pulse
     }
 
     function createEnhancedFilters() external pure returns (string memory);
 
-    function getFilterReference(
-        GlowIntensity intensity
-    ) external pure returns (string memory);
-
     function isPulsing(GlowIntensity intensity) external pure returns (bool);
 
-    function createPulseOpacityAnimation(
-        GlowIntensity intensity
-    ) external pure returns (string memory);
-
+    // UPDATED: Add size parameter
     function createWhiteHotStroke(
         uint256 shapeType,
         uint256 x,
         uint256 y,
         GlowIntensity intensity,
-        uint256 seed
+        uint256 seed,
+        uint256 size
     ) external pure returns (string memory);
 }
 
@@ -45,19 +36,7 @@ contract NeonEffects is INeonEffects {
         return
             string.concat(
                 "<defs>",
-                // Restore original powerful blur filter as the baseline for bars
-                _createOriginalBlurFilter(),
-                // Shape-specific filters - START HIGHER than the bar filter for more impact
-                _createStaticGlowFilter("glow-shape-low", 20, 50, 6, "0.9"), // Shapes start higher than bars
-                _createStaticGlowFilter("glow-med", 30, 70, 8, "1.1"), // Medium boost
-                _createStaticGlowFilter("glow-high", 40, 90, 10, "1.2"), // High intensity
-                _createStaticGlowFilter("glow-extreme", 60, 140, 12, "1.4"), // Extreme "on fire"
-                // Animated pulsing filters for shapes
-                _createPulsingGlowFilter("glow-pulse-slow", 3), // 3 second pulse
-                _createPulsingGlowFilter("glow-pulse-fast", 1), // 1 second pulse
-                _createPulsingGlowFilter("glow-pulse-extreme", 2), // 2 second extreme pulse
-                // Existing specular filter
-                _createSpecularFilter(),
+                _createOriginalBlurFilter(), // Only filter we actually use
                 "</defs>"
             );
     }
@@ -67,178 +46,24 @@ contract NeonEffects is INeonEffects {
             string.concat(
                 '<filter id="blur" filterUnits="userSpaceOnUse" ',
                 'x="-720" y="-720" width="2160" height="2160">',
-                // Initial blur to create the glow base
-                '<feGaussianBlur in="SourceGraphic" stdDeviation="15" result="innerGlow"/>',
-                // Brighten and colorize the glow
-                '<feColorMatrix in="innerGlow" type="matrix" values="',
-                "4 0 0 0 0.1 ", // More intense red
-                "0 4 0 0 0.1 ", // More intense green
-                "0 0 4 0 0.1 ", // More intense blue
-                '0 0 0 0.8 0" result="brightGlow"/>',
-                // Create wider outer halo
-                '<feGaussianBlur in="brightGlow" stdDeviation="40" result="outerHalo"/>',
-                // Layer the effects: wide halo + bright glow + original
+                // Multi-layer base glow
+                '<feGaussianBlur in="SourceGraphic" stdDeviation="5" result="tight"/>',
+                '<feColorMatrix in="tight" type="matrix" values="',
+                '6 0 0 0 0 0 6 0 0 0 0 0 6 0 0 0 0 0 1.0 0" result="tightColored"/>',
+                '<feGaussianBlur in="SourceGraphic" stdDeviation="15" result="medium"/>',
+                '<feColorMatrix in="medium" type="matrix" values="',
+                '4 0 0 0 0 0 4 0 0 0 0 0 4 0 0 0 0 0 0.8 0" result="mediumColored"/>',
+                '<feGaussianBlur in="SourceGraphic" stdDeviation="35" result="wide"/>',
+                '<feColorMatrix in="wide" type="matrix" values="',
+                '2 0 0 0 0 0 2 0 0 0 0 0 2 0 0 0 0 0 0.6 0" result="wideColored"/>',
                 "<feMerge>",
-                '<feMergeNode in="outerHalo"/>',
-                '<feMergeNode in="brightGlow"/>',
+                '<feMergeNode in="wideColored"/>',
+                '<feMergeNode in="mediumColored"/>',
+                '<feMergeNode in="tightColored"/>',
                 '<feMergeNode in="SourceGraphic"/>',
                 "</feMerge>",
                 "</filter>"
             );
-    }
-
-    function _createStaticGlowFilter(
-        string memory id,
-        uint256 innerBlur,
-        uint256 outerBlur,
-        uint256 colorMultiplier,
-        string memory opacity
-    ) internal pure returns (string memory) {
-        return
-            string.concat(
-                '<filter id="',
-                id,
-                '" filterUnits="userSpaceOnUse" x="-720" y="-720" width="2160" height="2160">',
-                // Layer 1: Tight, intense colored glow - REDUCE multiplier to keep color
-                '<feGaussianBlur in="SourceGraphic" stdDeviation="8" result="tightGlow"/>',
-                '<feColorMatrix in="tightGlow" type="matrix" values="',
-                Strings.toString(colorMultiplier),
-                " 0 0 0 0.1 ", // Reduced from 2x multiplier
-                "0 ",
-                Strings.toString(colorMultiplier),
-                " 0 0 0.1 ", // Lower offset for view color
-                "0 0 ",
-                Strings.toString(colorMultiplier),
-                " 0 0.1 ",
-                '0 0 0 1.2 0" result="intenseTightGlow"/>', // Reduced opacity
-                // Layer 2: Medium colored glow - KEEP color saturation
-                '<feGaussianBlur in="SourceGraphic" stdDeviation="',
-                Strings.toString(innerBlur),
-                '" result="innerGlow"/>',
-                '<feColorMatrix in="innerGlow" type="matrix" values="',
-                Strings.toString(colorMultiplier / 2),
-                " 0 0 0 0.05 ", // HALF the multiplier for more color
-                "0 ",
-                Strings.toString(colorMultiplier / 2),
-                " 0 0 0.05 ",
-                "0 0 ",
-                Strings.toString(colorMultiplier / 2),
-                " 0 0.05 ",
-                "0 0 0 ",
-                opacity,
-                ' 0" result="brightGlow"/>',
-                // Layer 3: Wide outer halo - MORE colorful, less white
-                '<feGaussianBlur in="brightGlow" stdDeviation="',
-                Strings.toString(outerBlur),
-                '" result="outerHalo"/>',
-                '<feColorMatrix in="outerHalo" type="matrix" values="',
-                '0.8 0 0 0 0 0 0.8 0 0 0 0 0 0.8 0 0 0 0 0 0.4 0" result="dimHalo"/>', // Increased from 0.5 to 0.8
-                // Merge all layers: wide dim halo + medium glow + tight intense glow + original sharp shape
-                "<feMerge>",
-                '<feMergeNode in="dimHalo"/>',
-                '<feMergeNode in="brightGlow"/>',
-                '<feMergeNode in="intenseTightGlow"/>',
-                '<feMergeNode in="SourceGraphic"/>',
-                "</feMerge>",
-                "</filter>"
-            );
-    }
-
-    function _createPulsingGlowFilter(
-        string memory id,
-        uint256 duration
-    ) internal pure returns (string memory) {
-        string memory dur = Strings.toString(duration);
-
-        return
-            string.concat(
-                '<filter id="',
-                id,
-                '" filterUnits="userSpaceOnUse" x="-720" y="-720" width="2160" height="2160">',
-                // Layer 1: Animated tight glow - REDUCE multipliers for more color
-                '<feGaussianBlur in="SourceGraphic" result="tightGlow">',
-                '<animate attributeName="stdDeviation" values="6;15;6" dur="',
-                dur,
-                's" repeatCount="indefinite"/>',
-                "</feGaussianBlur>",
-                '<feColorMatrix in="tightGlow" type="matrix" result="intenseTightGlow">',
-                '<animate attributeName="values" values="',
-                "12 0 0 0 0.1 0 12 0 0 0.1 0 0 12 0 0.1 0 0 0 1.2 0;", // Reduced from 20x to 12x
-                "25 0 0 0 0.3 0 25 0 0 0.3 0 0 25 0 0.3 0 0 0 1.6 0;", // Reduced from 60x to 25x
-                '12 0 0 0 0.1 0 12 0 0 0.1 0 0 12 0 0.1 0 0 0 1.2 0"', // Back to 12x
-                ' dur="',
-                dur,
-                's" repeatCount="indefinite"/>',
-                "</feColorMatrix>",
-                // Layer 2: Animated medium glow - REDUCE multipliers
-                '<feGaussianBlur in="SourceGraphic" result="innerGlow">',
-                '<animate attributeName="stdDeviation" values="25;50;25" dur="',
-                dur,
-                's" repeatCount="indefinite"/>',
-                "</feGaussianBlur>",
-                '<feColorMatrix in="innerGlow" type="matrix" result="brightGlow">',
-                '<animate attributeName="values" values="',
-                "6 0 0 0 0.05 0 6 0 0 0.05 0 0 6 0 0.05 0 0 0 1.0 0;", // Reduced from 15x to 6x
-                "12 0 0 0 0.15 0 12 0 0 0.15 0 0 12 0 0.15 0 0 0 1.4 0;", // Reduced from 30x to 12x
-                '6 0 0 0 0.05 0 6 0 0 0.05 0 0 6 0 0.05 0 0 0 1.0 0"', // Back to 6x
-                ' dur="',
-                dur,
-                's" repeatCount="indefinite"/>',
-                "</feColorMatrix>",
-                // Layer 3: Animated outer halo - MORE colorful
-                '<feGaussianBlur in="brightGlow" result="outerHalo">',
-                '<animate attributeName="stdDeviation" values="60;120;60" dur="',
-                dur,
-                's" repeatCount="indefinite"/>',
-                "</feGaussianBlur>",
-                '<feColorMatrix in="outerHalo" type="matrix" values="',
-                '0.7 0 0 0 0 0 0.7 0 0 0 0 0 0.7 0 0 0 0 0 0.35 0" result="dimHalo"/>', // More colorful
-                // NEW: "White hot" effect for the original shape - MUCH more dramatic
-                '<feColorMatrix in="SourceGraphic" type="matrix" result="heatedShape">',
-                '<animate attributeName="values" values="',
-                "1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 1 0;", // Normal colors
-                "1 0 0 0 1.5 0 1 0 0 1.5 0 0 1 0 1.5 0 0 0 1 0;", // NUCLEAR white (1.5 = guaranteed view white)
-                '1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 1 0"', // Back to normal
-                ' dur="',
-                dur,
-                's" repeatCount="indefinite"/>',
-                "</feColorMatrix>",
-                // Merge: dim halo + medium glow + heated shape + tight glow (tight glow on top for definition)
-                "<feMerge>",
-                '<feMergeNode in="dimHalo"/>',
-                '<feMergeNode in="brightGlow"/>',
-                '<feMergeNode in="heatedShape"/>', // Move heated shape BEFORE tight glow
-                '<feMergeNode in="intenseTightGlow"/>', // Tight glow on top for edge definition
-                "</feMerge>",
-                "</filter>"
-            );
-    }
-
-    function _createSpecularFilter() internal pure returns (string memory) {
-        return
-            string.concat(
-                '<filter id="spec" filterUnits="userSpaceOnUse" x="-720" y="-720" width="2160" height="2160">',
-                '<feSpecularLighting result="specOut" lighting-color="white" specularConstant="2" specularExponent="20">',
-                '<fePointLight x="360" y="360" z="200"/>',
-                "</feSpecularLighting>",
-                '<feComposite in="specOut" in2="SourceAlpha" operator="in"/>',
-                '<feComposite in="SourceGraphic" in2="specOut" operator="arithmetic" k1="0" k2="1" k3="1" k4="0"/>',
-                "</filter>"
-            );
-    }
-
-    function getFilterReference(
-        GlowIntensity intensity
-    ) external pure override returns (string memory) {
-        if (intensity == GlowIntensity.LOW) return "glow-shape-low"; // Shapes start with higher glow than bars
-        if (intensity == GlowIntensity.MEDIUM) return "glow-med";
-        if (intensity == GlowIntensity.HIGH) return "glow-high";
-        if (intensity == GlowIntensity.EXTREME) return "glow-extreme";
-        if (intensity == GlowIntensity.PULSE_SLOW) return "glow-pulse-slow";
-        if (intensity == GlowIntensity.PULSE_FAST) return "glow-pulse-fast";
-        if (intensity == GlowIntensity.PULSE_EXTREME)
-            return "glow-pulse-extreme";
-        return "glow-shape-low"; // fallback to shape-specific higher glow
     }
 
     function isPulsing(
@@ -250,55 +75,61 @@ contract NeonEffects is INeonEffects {
             intensity == GlowIntensity.PULSE_EXTREME;
     }
 
-    function createPulseOpacityAnimation(
-        GlowIntensity intensity
-    ) external pure override returns (string memory) {
-        string memory duration = "2"; // default
-        if (intensity == GlowIntensity.PULSE_FAST) duration = "1";
-        if (intensity == GlowIntensity.PULSE_SLOW) duration = "3";
-
-        return
-            string.concat(
-                '<animate attributeName="opacity" values="0.7;1.0;0.7" dur="',
-                duration,
-                's" repeatCount="indefinite"/>'
-            );
-    }
-
+    // UPDATED: Now accepts size parameter
     function createWhiteHotStroke(
         uint256 shapeType,
         uint256 x,
         uint256 y,
         GlowIntensity intensity,
-        uint256 seed
+        uint256 seed,
+        uint256 size
     ) external pure override returns (string memory) {
-        string memory dur = intensity == GlowIntensity.PULSE_FAST
-            ? "1"
-            : intensity == GlowIntensity.PULSE_SLOW
-            ? "3"
-            : "2";
+        if (shapeType == 0) return _createWhiteHotCircle(x, y, intensity, size);
+        if (shapeType == 1)
+            return _createWhiteHotDiamond(x, y, intensity, seed, size);
+        if (shapeType == 2)
+            return _createWhiteHotSquareDiamond(x, y, intensity, size);
+        return _createWhiteHotCrossSquare(x, y, intensity, size);
+    }
 
-        if (shapeType == 0) {
-            // Circle - unchanged
-            return
-                string.concat(
-                    "<g>",
+    function _createWhiteHotCircle(
+        uint256 x,
+        uint256 y,
+        GlowIntensity intensity,
+        uint256 size
+    ) internal pure returns (string memory) {
+        string memory dur = _getDuration(intensity);
+        return
+            string(
+                abi.encodePacked(
                     '<circle cx="',
                     Strings.toString(x),
                     '" cy="',
                     Strings.toString(y),
-                    '" r="60" fill="none" stroke="white" stroke-width="3" filter="url(#blur)" stroke-opacity="0.4">',
+                    '" r="',
+                    Strings.toString(size), // Use dynamic size
+                    '" fill="none" stroke="white" stroke-width="',
+                    Strings.toString(_getStrokeWidth(size)),
+                    '" filter="url(#blur)" stroke-opacity="0.4">',
                     '<animate attributeName="opacity" values="0;0.6;0" dur="',
                     dur,
                     's" repeatCount="indefinite"/>',
-                    "</circle>",
-                    "</g>"
-                );
-        } else if (shapeType == 1) {
-            // Diamond - with rotation
-            return
-                string.concat(
-                    "<g>",
+                    "</circle>"
+                )
+            );
+    }
+
+    function _createWhiteHotDiamond(
+        uint256 x,
+        uint256 y,
+        GlowIntensity intensity,
+        uint256 seed,
+        uint256 size
+    ) internal pure returns (string memory) {
+        string memory dur = _getDuration(intensity);
+        return
+            string(
+                abi.encodePacked(
                     '<g transform="translate(',
                     Strings.toString(x),
                     ",",
@@ -306,31 +137,208 @@ contract NeonEffects is INeonEffects {
                     ") rotate(",
                     _intToString(int256((seed % 61)) - 30),
                     ')">',
-                    '<polygon points="0,-25 50,0 0,25 -50,0" fill="none" stroke="white" stroke-width="3" filter="url(#blur)" stroke-opacity="0.4">',
+                    '<polygon points="0,-',
+                    Strings.toString(size / 4), // Dynamic quarter size
+                    " ",
+                    Strings.toString(size / 2), // Dynamic half size
+                    ",0 0,",
+                    Strings.toString(size / 4),
+                    " -",
+                    Strings.toString(size / 2),
+                    ',0" fill="none" stroke="white" stroke-width="',
+                    Strings.toString(_getStrokeWidth(size)),
+                    '" filter="url(#blur)" stroke-opacity="0.4">',
                     '<animate attributeName="opacity" values="0;0.6;0" dur="',
                     dur,
                     's" repeatCount="indefinite"/>',
-                    "</polygon>",
-                    "</g>",
-                    "</g>"
-                );
-        } else {
-            // Square - unchanged
-            return
-                string.concat(
-                    "<g>",
+                    "</polygon></g>"
+                )
+            );
+    }
+
+    function _createWhiteHotSquareDiamond(
+        uint256 x,
+        uint256 y,
+        GlowIntensity intensity,
+        uint256 size
+    ) internal pure returns (string memory) {
+        string memory dur = _getDuration(intensity);
+
+        string memory outerSquare = string(
+            abi.encodePacked(
+                '<rect x="',
+                Strings.toString(x - size / 2), // Dynamic half size
+                '" y="',
+                Strings.toString(y - size / 2),
+                '" width="',
+                Strings.toString(size), // Dynamic size
+                '" height="',
+                Strings.toString(size),
+                '" fill="none" stroke="white" stroke-width="',
+                Strings.toString(_getStrokeWidth(size)),
+                '" filter="url(#blur)" stroke-opacity="0.4">',
+                '<animate attributeName="opacity" values="0;0.6;0" dur="',
+                dur,
+                's" repeatCount="indefinite"/>',
+                "</rect>"
+            )
+        );
+
+        uint256 innerSize = (size * 2) / 3; // Dynamic inner size
+        string memory innerDiamond = string(
+            abi.encodePacked(
+                '<g transform="translate(',
+                Strings.toString(x),
+                ",",
+                Strings.toString(y),
+                ') rotate(45)">',
+                '<rect x="-',
+                Strings.toString(innerSize / 2),
+                '" y="-',
+                Strings.toString(innerSize / 2),
+                '" width="',
+                Strings.toString(innerSize),
+                '" height="',
+                Strings.toString(innerSize),
+                '" fill="none" stroke="white" stroke-width="',
+                Strings.toString(_getStrokeWidth(size)),
+                '" filter="url(#blur)" stroke-opacity="0.4">',
+                '<animate attributeName="opacity" values="0;0.6;0" dur="',
+                dur,
+                's" repeatCount="indefinite"/>',
+                "</rect></g>"
+            )
+        );
+
+        return
+            string(abi.encodePacked("<g>", outerSquare, innerDiamond, "</g>"));
+    }
+
+    function _createWhiteHotCrossSquare(
+        uint256 x,
+        uint256 y,
+        GlowIntensity intensity,
+        uint256 size
+    ) internal pure returns (string memory) {
+        return
+            string(
+                abi.encodePacked(
+                    _createWhiteSquare(x, y, intensity, size),
+                    _createWhiteDiagonals(x, y, intensity, size)
+                )
+            );
+    }
+
+    function _createWhiteSquare(
+        uint256 x,
+        uint256 y,
+        GlowIntensity intensity,
+        uint256 size
+    ) internal pure returns (string memory) {
+        string memory dur = _getDuration(intensity);
+        return
+            string(
+                abi.encodePacked(
                     '<rect x="',
-                    Strings.toString(x - 25),
+                    Strings.toString(x - size / 2),
                     '" y="',
-                    Strings.toString(y - 25),
-                    '" width="50" height="50" fill="none" stroke="white" stroke-width="3" filter="url(#blur)" stroke-opacity="0.4">',
+                    Strings.toString(y - size / 2),
+                    '" width="',
+                    Strings.toString(size),
+                    '" height="',
+                    Strings.toString(size),
+                    '" fill="none" stroke="white" stroke-width="4" filter="url(#blur)" stroke-opacity="0.4">',
                     '<animate attributeName="opacity" values="0;0.6;0" dur="',
                     dur,
                     's" repeatCount="indefinite"/>',
-                    "</rect>",
-                    "</g>"
-                );
-        }
+                    "</rect>"
+                )
+            );
+    }
+
+    function _createWhiteDiagonals(
+        uint256 x,
+        uint256 y,
+        GlowIntensity intensity,
+        uint256 size
+    ) internal pure returns (string memory) {
+        return
+            string(
+                abi.encodePacked(
+                    _createWhiteDiagonal1(x, y, intensity, size),
+                    _createWhiteDiagonal2(x, y, intensity, size)
+                )
+            );
+    }
+
+    function _createWhiteDiagonal1(
+        uint256 x,
+        uint256 y,
+        GlowIntensity intensity,
+        uint256 size
+    ) internal pure returns (string memory) {
+        string memory dur = _getDuration(intensity);
+        return
+            string(
+                abi.encodePacked(
+                    '<line x1="',
+                    Strings.toString(x - size / 2),
+                    '" y1="',
+                    Strings.toString(y - size / 2),
+                    '" x2="',
+                    Strings.toString(x + size / 2),
+                    '" y2="',
+                    Strings.toString(y + size / 2),
+                    '" stroke="white" stroke-width="4" filter="url(#blur)" stroke-opacity="0.4">',
+                    '<animate attributeName="opacity" values="0;0.6;0" dur="',
+                    dur,
+                    's" repeatCount="indefinite"/>',
+                    "</line>"
+                )
+            );
+    }
+
+    function _createWhiteDiagonal2(
+        uint256 x,
+        uint256 y,
+        GlowIntensity intensity,
+        uint256 size
+    ) internal pure returns (string memory) {
+        string memory dur = _getDuration(intensity);
+        return
+            string(
+                abi.encodePacked(
+                    '<line x1="',
+                    Strings.toString(x + size / 2),
+                    '" y1="',
+                    Strings.toString(y - size / 2),
+                    '" x2="',
+                    Strings.toString(x - size / 2),
+                    '" y2="',
+                    Strings.toString(y + size / 2),
+                    '" stroke="white" stroke-width="4" filter="url(#blur)" stroke-opacity="0.4">',
+                    '<animate attributeName="opacity" values="0;0.6;0" dur="',
+                    dur,
+                    's" repeatCount="indefinite"/>',
+                    "</line>"
+                )
+            );
+    }
+
+    function _getStrokeWidth(uint256 size) internal pure returns (uint256) {
+        // Scale stroke width with size: 30-80 -> 3-8
+        uint256 stroke = (size * 8) / 80;
+        if (stroke < 3) return 3;
+        if (stroke > 8) return 8;
+        return stroke;
+    }
+
+    function _getDuration(
+        GlowIntensity intensity
+    ) internal pure returns (string memory) {
+        if (intensity == GlowIntensity.PULSE_FAST) return "1";
+        if (intensity == GlowIntensity.PULSE_SLOW) return "3";
+        return "2"; // PULSE_EXTREME default
     }
 
     function _intToString(int256 value) internal pure returns (string memory) {
