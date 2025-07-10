@@ -190,20 +190,107 @@ contract VisualCore is IVisualCore {
     ) external pure override returns (string memory) {
         return
             string.concat(
-                '<rect x="30" y="30" width="1380" height="1380" fill="none" stroke="',
-                colorA,
-                '" stroke-width="10" filter="url(#blur)"/>',
-                '<rect x="30" y="30" width="1380" height="1380" fill="none" stroke="',
-                colorA,
-                '" stroke-width="10"/>',
-                '<rect x="60" y="60" width="1320" height="1320" fill="none" stroke="',
-                colorB,
-                '" stroke-width="10" filter="url(#blur)"/>',
-                '<rect x="60" y="60" width="1320" height="1320" fill="none" stroke="',
-                colorB,
-                '" stroke-width="10"/>'
+                _createFrameGradientDefs(colorA, colorB),
+                _createOuterFrame(),
+                _createInnerFrame()
             );
     }
+
+    // === FRAME GRADIENT DEFINITIONS ===
+    function _createFrameGradientDefs(
+        string memory colorA,
+        string memory colorB
+    ) internal pure returns (string memory) {
+        return
+            string.concat(
+                "<defs>",
+                // Outer frame gradient: B to A (reverse) - rotating gradient
+                '<linearGradient id="outerFrameGrad" x1="0" y1="0" x2="1" y2="1">',
+                '<stop offset="0" stop-color="',
+                colorB,
+                '"/>',
+                '<stop offset="0.5" stop-color="',
+                colorA,
+                '"/>',
+                '<stop offset="1" stop-color="',
+                colorB,
+                '"/>',
+                '<animateTransform attributeName="gradientTransform" type="rotate" values="0 0.5 0.5;360 0.5 0.5" dur="8s" repeatCount="indefinite"/>',
+                "</linearGradient>",
+                // Inner frame gradient: A to B (normal) - rotating gradient
+                '<linearGradient id="innerFrameGrad" x1="0" y1="0" x2="1" y2="1">',
+                '<stop offset="0" stop-color="',
+                colorA,
+                '"/>',
+                '<stop offset="0.5" stop-color="',
+                colorB,
+                '"/>',
+                '<stop offset="1" stop-color="',
+                colorA,
+                '"/>',
+                '<animateTransform attributeName="gradientTransform" type="rotate" values="360 0.5 0.5;0 0.5 0.5" dur="10s" repeatCount="indefinite"/>',
+                "</linearGradient>",
+                "</defs>"
+            );
+    }
+
+    // === OUTER FRAME (4 layers) ===
+    function _createOuterFrame() internal pure returns (string memory) {
+        return
+            string.concat(
+                // Wide glow layer
+                '<rect x="30" y="30" width="1380" height="1380" fill="none" stroke="url(#outerFrameGrad)" stroke-width="30" filter="url(#blur)" opacity="0.5"/>',
+                // Medium glow layer
+                '<rect x="30" y="30" width="1380" height="1380" fill="none" stroke="url(#outerFrameGrad)" stroke-width="20" filter="url(#blur)" opacity="0.7"/>',
+                // Crisp layer
+                '<rect x="30" y="30" width="1380" height="1380" fill="none" stroke="url(#outerFrameGrad)" stroke-width="10"/>',
+                // White hot layer (always pulsing)
+                '<rect x="30" y="30" width="1380" height="1380" fill="none" stroke="white" stroke-width="1" filter="url(#blur)" opacity="0.9">',
+                '<animate attributeName="opacity" values="0.3;0.9;0.3" dur="3s" repeatCount="indefinite"/>',
+                '<animate attributeName="stroke-width" values="0.5;3;0.5" dur="3s" repeatCount="indefinite"/>',
+                "</rect>"
+            );
+    }
+
+    // === INNER FRAME (4 layers) ===
+    function _createInnerFrame() internal pure returns (string memory) {
+        return
+            string.concat(
+                // Wide glow layer
+                '<rect x="60" y="60" width="1320" height="1320" fill="none" stroke="url(#innerFrameGrad)" stroke-width="30" filter="url(#blur)" opacity="0.5"/>',
+                // Medium glow layer
+                '<rect x="60" y="60" width="1320" height="1320" fill="none" stroke="url(#innerFrameGrad)" stroke-width="20" filter="url(#blur)" opacity="0.7"/>',
+                // Crisp layer
+                '<rect x="60" y="60" width="1320" height="1320" fill="none" stroke="url(#innerFrameGrad)" stroke-width="10"/>',
+                // White hot layer (always pulsing)
+                '<rect x="60" y="60" width="1320" height="1320" fill="none" stroke="white" stroke-width="1" filter="url(#blur)" opacity="0.9">',
+                '<animate attributeName="opacity" values="0.3;0.9;0.3" dur="3s" repeatCount="indefinite"/>',
+                '<animate attributeName="stroke-width" values="0.5;3;0.5" dur="3s" repeatCount="indefinite"/>',
+                "</rect>"
+            );
+    }
+
+    // === FRAMES ===
+    // function createFrames(
+    //     string memory colorA,
+    //     string memory colorB
+    // ) external pure override returns (string memory) {
+    //     return
+    //         string.concat(
+    //             '<rect x="30" y="30" width="1380" height="1380" fill="none" stroke="',
+    //             colorA,
+    //             '" stroke-width="10" filter="url(#blur)"/>',
+    //             '<rect x="30" y="30" width="1380" height="1380" fill="none" stroke="',
+    //             colorA,
+    //             '" stroke-width="10"/>',
+    //             '<rect x="60" y="60" width="1320" height="1320" fill="none" stroke="',
+    //             colorB,
+    //             '" stroke-width="10" filter="url(#blur)"/>',
+    //             '<rect x="60" y="60" width="1320" height="1320" fill="none" stroke="',
+    //             colorB,
+    //             '" stroke-width="10"/>'
+    //         );
+    // }
 
     // === TEXT STYLE ===
     function generateTextStyle(

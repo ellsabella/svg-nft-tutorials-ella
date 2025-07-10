@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: MIT
-
 pragma solidity ^0.8.26;
 
 import {Random, RandomCtx} from "./utils/Random.sol";
@@ -28,21 +27,46 @@ contract RedCircles is IRedCircles {
 
         return
             string.concat(
+                _createRedGradientDefs(),
                 "<g>",
-                _createGlowLayer(x, y, size, animationPattern),
+                _createWideGlowLayer(x, y, size, animationPattern),
+                _createMediumGlowLayer(x, y, size, animationPattern),
                 _createCrispLayer(x, y, size, animationPattern),
                 _createWhiteHotLayer(x, y, size, animationPattern),
                 "</g>"
             );
     }
 
-    // === GLOW LAYER (with blur filter) ===
-    function _createGlowLayer(
+    // === GRADIENT DEFINITIONS ===
+    function _createRedGradientDefs() internal pure returns (string memory) {
+        return
+            string.concat(
+                "<defs>",
+                // Red to amber gradient
+                '<linearGradient id="redAmber">',
+                '<stop offset="0" stop-color="#FF4444"/>',
+                '<stop offset="0.7" stop-color="#FF6644"/>',
+                '<stop offset="1" stop-color="#FFAA44"/>',
+                "</linearGradient>",
+                "</defs>"
+            );
+    }
+
+    // === WIDE GLOW LAYER (NEW) ===
+    function _createWideGlowLayer(
         uint16 x,
         uint16 y,
         uint8 size,
         uint8 pattern
     ) internal pure returns (string memory) {
+        uint8 strokeWidth = _getStrokeWidth(size);
+        uint8 wideStrokeWidth = strokeWidth;
+        if (strokeWidth <= 5) {
+            wideStrokeWidth = strokeWidth * 3;
+        } else {
+            wideStrokeWidth = 15;
+        }
+
         string memory baseCircle = string.concat(
             '<circle cx="',
             Strings.toString(x),
@@ -50,7 +74,9 @@ contract RedCircles is IRedCircles {
             Strings.toString(y),
             '" r="',
             Strings.toString(size),
-            '" fill="none" stroke="#FF4444" stroke-width="6" filter="url(#blur)">'
+            '" fill="none" stroke="url(#redAmber)" stroke-width="',
+            Strings.toString(wideStrokeWidth),
+            '" filter="url(#blur)" opacity="0.5">'
         );
 
         return
@@ -61,13 +87,50 @@ contract RedCircles is IRedCircles {
             );
     }
 
-    // === CRISP LAYER (no filter) ===
+    // === MEDIUM GLOW LAYER (RENAMED FROM GLOW) ===
+    function _createMediumGlowLayer(
+        uint16 x,
+        uint16 y,
+        uint8 size,
+        uint8 pattern
+    ) internal pure returns (string memory) {
+        uint8 strokeWidth = _getStrokeWidth(size);
+        uint8 mediumStrokeWidth = strokeWidth;
+        if (strokeWidth <= 5) {
+            mediumStrokeWidth = strokeWidth * 2;
+        } else {
+            mediumStrokeWidth = 10;
+        }
+
+        string memory baseCircle = string.concat(
+            '<circle cx="',
+            Strings.toString(x),
+            '" cy="',
+            Strings.toString(y),
+            '" r="',
+            Strings.toString(size),
+            '" fill="none" stroke="url(#redAmber)" stroke-width="',
+            Strings.toString(mediumStrokeWidth),
+            '" filter="url(#blur)" opacity="0.7">'
+        );
+
+        return
+            string.concat(
+                baseCircle,
+                _getAnimationForPattern(x, y, size, pattern),
+                "</circle>"
+            );
+    }
+
+    // === CRISP LAYER (UPDATED) ===
     function _createCrispLayer(
         uint16 x,
         uint16 y,
         uint8 size,
         uint8 pattern
     ) internal pure returns (string memory) {
+        uint8 strokeWidth = _getStrokeWidth(size);
+
         string memory baseCircle = string.concat(
             '<circle cx="',
             Strings.toString(x),
@@ -75,7 +138,9 @@ contract RedCircles is IRedCircles {
             Strings.toString(y),
             '" r="',
             Strings.toString(size),
-            '" fill="none" stroke="#FF4444" stroke-width="6">'
+            '" fill="none" stroke="url(#redAmber)" stroke-width="',
+            Strings.toString(strokeWidth),
+            '">'
         );
 
         return
@@ -86,7 +151,7 @@ contract RedCircles is IRedCircles {
             );
     }
 
-    // === WHITE HOT LAYER (animated opacity) ===
+    // === WHITE HOT LAYER (UPGRADED) ===
     function _createWhiteHotLayer(
         uint16 x,
         uint16 y,
@@ -100,19 +165,32 @@ contract RedCircles is IRedCircles {
             Strings.toString(y),
             '" r="',
             Strings.toString(size),
-            '" fill="none" stroke="white" stroke-width="6" filter="url(#blur)" stroke-opacity="0.4">'
+            '" fill="none" stroke="white" stroke-width="2" filter="url(#blur)" opacity="0.9">'
         );
 
         return
             string.concat(
                 baseCircle,
                 _getAnimationForPattern(x, y, size, pattern),
-                '<animate attributeName="opacity" values="0;0.6;0" dur="4s" repeatCount="indefinite"/>',
+                // Upgraded animation: both opacity and stroke-width
+                '<animate attributeName="opacity" values="0.3;0.9;0.3" dur="4s" repeatCount="indefinite"/>',
+                '<animate attributeName="stroke-width" values="1;3;1" dur="4s" repeatCount="indefinite"/>',
                 "</circle>"
             );
     }
 
-    // === ANIMATION PATTERNS ===
+    // === UTILITY FUNCTIONS ===
+    function _getStrokeWidth(uint8 size) internal pure returns (uint8) {
+        // Same logic as NeonPortal - responsive stroke width
+        if (size < 15) return 2;
+
+        uint256 calculation = (uint256(size) * 4) / 60;
+        if (calculation < 2) return 2;
+        if (calculation > 10) return 10; // Cap for red circles
+        return uint8(calculation);
+    }
+
+    // === ANIMATION PATTERNS (UNCHANGED) ===
     function _getAnimationForPattern(
         uint16 x,
         uint16 y,
@@ -207,7 +285,6 @@ contract RedCircles is IRedCircles {
             );
     }
 }
-
 // pragma solidity ^0.8.26;
 
 // import {Random, RandomCtx} from "./utils/Random.sol";
@@ -308,14 +385,14 @@ contract RedCircles is IRedCircles {
 //             Strings.toString(y),
 //             '" r="',
 //             Strings.toString(size),
-//             '" fill="none" stroke="white" stroke-width="6" filter="url(#blur)" stroke-opacity="0.4">'
+//             '" fill="none" stroke="white" stroke-width="3" filter="url(#blur)" stroke-opacity="0.7">'
 //         );
 
 //         return
 //             string.concat(
 //                 baseCircle,
 //                 _getAnimationForPattern(x, y, size, pattern),
-//                 '<animate attributeName="opacity" values="0;0.6;0" dur="4s" repeatCount="indefinite"/>',
+//                 '<animate attributeName="opacity" values="0.3;0.9;0.3" dur="4s" repeatCount="indefinite"/>',
 //                 "</circle>"
 //             );
 //     }

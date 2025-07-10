@@ -8,6 +8,7 @@ import {RedCircles} from "../src/RedCircles.sol";
 import {BlueDiamonds} from "../src/BlueDiamonds.sol";
 import {GreenSquares} from "../src/GreenSquares.sol";
 import {BasicShapes} from "../src/BasicShapes.sol";
+import {NeonPortal} from "../src/NeonPortal.sol";
 
 contract OnChainArtTest is AbstractTest {
     OnChainArt public renderer;
@@ -16,6 +17,7 @@ contract OnChainArtTest is AbstractTest {
     BlueDiamonds public blueDiamonds;
     GreenSquares public greenSquares;
     BasicShapes public basicShapes;
+    NeonPortal public neonPortal;
 
     function setUp() public {
         // 1. Deploy all specialized contracts
@@ -24,6 +26,7 @@ contract OnChainArtTest is AbstractTest {
         blueDiamonds = new BlueDiamonds();
         greenSquares = new GreenSquares();
         basicShapes = new BasicShapes();
+        neonPortal = new NeonPortal();
 
         // 2. Deploy main orchestrator with all contract addresses
         renderer = new OnChainArt(
@@ -31,7 +34,8 @@ contract OnChainArtTest is AbstractTest {
             address(redCircles),
             address(blueDiamonds),
             address(greenSquares),
-            address(basicShapes)
+            address(basicShapes),
+            address(neonPortal)
         );
     }
 
@@ -151,6 +155,29 @@ contract OnChainArtTest is AbstractTest {
         require(bytes(crossSquare).length > 0, "Cross square should render");
     }
 
+    function testNeonPortal() public view {
+        string memory portal = neonPortal.createNeonPortal(
+            720,
+            720,
+            80,
+            12345,
+            false // no pulse
+        );
+        require(bytes(portal).length > 0, "Neon portal should render");
+
+        string memory pulsingPortal = neonPortal.createNeonPortal(
+            720,
+            720,
+            80,
+            12345,
+            true // with pulse
+        );
+        require(
+            bytes(pulsingPortal).length > 0,
+            "Pulsing portal should render"
+        );
+    }
+
     function testArchitecture() public view {
         // Test that all contracts are properly connected
         require(
@@ -172,6 +199,10 @@ contract OnChainArtTest is AbstractTest {
         require(
             address(renderer.basicShapes()) == address(basicShapes),
             "BasicShapes not connected"
+        );
+        require(
+            address(renderer.neonPortal()) == address(neonPortal), // ADD THIS LINE
+            "NeonPortal not connected"
         );
     }
 }

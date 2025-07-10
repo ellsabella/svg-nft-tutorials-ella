@@ -11,6 +11,7 @@ import {RedCircles} from "./RedCircles.sol";
 import {BlueDiamonds} from "./BlueDiamonds.sol";
 import {GreenSquares} from "./GreenSquares.sol";
 import {BasicShapes} from "./BasicShapes.sol";
+import {NeonPortal} from "./NeonPortal.sol";
 
 contract OnChainArt is ERC721 {
     VisualCore public immutable visualCore;
@@ -18,19 +19,22 @@ contract OnChainArt is ERC721 {
     BlueDiamonds public immutable blueDiamonds;
     GreenSquares public immutable greenSquares;
     BasicShapes public immutable basicShapes;
+    NeonPortal public immutable neonPortal;
 
     constructor(
         address _visualCore,
         address _redCircles,
         address _blueDiamonds,
         address _greenSquares,
-        address _basicShapes
+        address _basicShapes,
+        address _neonPortal
     ) ERC721("On-chain Art", "ART") {
         visualCore = VisualCore(_visualCore);
         redCircles = RedCircles(_redCircles);
         blueDiamonds = BlueDiamonds(_blueDiamonds);
         greenSquares = GreenSquares(_greenSquares);
         basicShapes = BasicShapes(_basicShapes);
+        neonPortal = NeonPortal(_neonPortal);
     }
 
     function mint(address to, uint256 id) external {
@@ -61,9 +65,48 @@ contract OnChainArt is ERC721 {
         return
             string.concat(
                 _generateRedCircles(tokenId, plan),
-                _generateSecondaryCluster(tokenId, plan),
-                _generateTertiaryClusters(tokenId, plan),
-                _generatePinkSquares(tokenId, plan)
+                // _generateSecondaryCluster(tokenId, plan),
+                // _generateTertiaryClusters(tokenId, plan),
+                _generatePinkSquares(tokenId, plan),
+                _generateNeonPortal(tokenId)
+            );
+    }
+
+    // function _generateNeonPortal(
+    //     uint256 tokenId
+    // ) internal view returns (string memory) {
+    //     // Fixed center position and size for now
+    //     uint16 centerX = 720;
+    //     uint16 centerY = 720;
+    //     uint16 portalSize = 380;
+    //     bool enablePulse = (tokenId % 2) == 0; // 33% chance of pulsing
+
+    //     return
+    //         neonPortal.createNeonPortal(
+    //             centerX,
+    //             centerY,
+    //             portalSize,
+    //             tokenId,
+    //             enablePulse
+    //         );
+    // }
+
+    function _generateNeonPortal(
+        uint256 tokenId
+    ) internal view returns (string memory) {
+        // Fixed center position and size for now
+        uint16 centerX = 720;
+        uint16 centerY = 720;
+        uint8 portalSize = 80; // CHANGED: uint8 instead of uint16
+        bool enablePulse = (tokenId % 3) == 0; // 33% chance of pulsing
+
+        return
+            neonPortal.createNeonPortal(
+                centerX,
+                centerY,
+                portalSize, // Now correctly uint8
+                tokenId,
+                enablePulse
             );
     }
 

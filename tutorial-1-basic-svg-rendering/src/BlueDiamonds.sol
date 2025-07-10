@@ -25,63 +25,49 @@ contract BlueDiamonds is IBlueDiamonds {
         // Ensure minimum size to prevent underflow
         if (size < 10) size = 10;
 
-        uint8 strokeWidth = _getStrokeWidth(size);
-
-        // Add back glow layer - using simplified version with stroke calculation
-        string memory simpleGlow = string.concat(
-            '<g transform="translate(',
-            Strings.toString(x),
-            ",",
-            Strings.toString(y),
-            ') rotate(0)">',
-            '<polygon points="0,-',
-            Strings.toString(size >= 4 ? size / 4 : 1),
-            " ",
-            Strings.toString(size >= 2 ? size / 2 : 1),
-            ",0 0,",
-            Strings.toString(size >= 4 ? size / 4 : 1),
-            " -",
-            Strings.toString(size >= 2 ? size / 2 : 1),
-            ',0" fill="none" stroke="#44DDFF" stroke-width="',
-            Strings.toString(strokeWidth),
-            '" filter="url(#blur)"/>',
-            "</g>"
-        );
-
-        string memory simpleCrisp = string.concat(
-            '<g transform="translate(',
-            Strings.toString(x),
-            ",",
-            Strings.toString(y),
-            ') rotate(0)">',
-            '<polygon points="0,-',
-            Strings.toString(size >= 4 ? size / 4 : 1),
-            " ",
-            Strings.toString(size >= 2 ? size / 2 : 1),
-            ",0 0,",
-            Strings.toString(size >= 4 ? size / 4 : 1),
-            " -",
-            Strings.toString(size >= 2 ? size / 2 : 1),
-            ',0" fill="none" stroke="#44DDFF" stroke-width="',
-            Strings.toString(strokeWidth),
-            '"/>',
-            "</g>"
-        );
-
-        return string.concat("<g>", simpleGlow, simpleCrisp, "</g>");
+        return
+            string.concat(
+                _createBlueGradientDefs(),
+                "<g>",
+                _createWideGlowLayer(x, y, size, seed),
+                _createMediumGlowLayer(x, y, size, seed),
+                _createCrispLayer(x, y, size, seed),
+                _createWhiteHotLayer(x, y, size, seed, enablePulse),
+                "</g>"
+            );
     }
 
-    // === GLOW LAYER (with blur filter) ===
-    function _createGlowLayer(
+    // === GRADIENT DEFINITIONS ===
+    function _createBlueGradientDefs() internal pure returns (string memory) {
+        return
+            string.concat(
+                "<defs>",
+                // Radial gradient: mid-blue center to cyan edges
+                '<radialGradient id="blueCyan" cx="0.5" cy="0.5">',
+                '<stop offset="0" stop-color="#66DDFF"/>',
+                '<stop offset="0.7" stop-color="#66AADD"/>',
+                '<stop offset="1" stop-color="#66DDFF"/>',
+                "</radialGradient>",
+                "</defs>"
+            );
+    }
+
+    // === WIDE GLOW LAYER ===
+    function _createWideGlowLayer(
         uint16 x,
         uint16 y,
         uint8 size,
         uint256 seed
     ) internal pure returns (string memory) {
-        string memory rotation = _getRotation(seed);
         uint8 strokeWidth = _getStrokeWidth(size);
+        uint8 wideStrokeWidth = strokeWidth;
+        if (strokeWidth <= 5) {
+            wideStrokeWidth = strokeWidth * 3;
+        } else {
+            wideStrokeWidth = 15;
+        }
 
-        // Ensure minimum values for polygon calculations
+        string memory rotation = _getRotation(seed);
         uint8 quarter = size >= 4 ? size / 4 : 1;
         uint8 half = size >= 2 ? size / 2 : 1;
 
@@ -102,24 +88,65 @@ contract BlueDiamonds is IBlueDiamonds {
                 Strings.toString(quarter),
                 " -",
                 Strings.toString(half),
-                ',0" fill="none" stroke="#44DDFF" stroke-width="',
-                Strings.toString(strokeWidth),
-                '" filter="url(#blur)"/>',
+                ',0" fill="none" stroke="url(#blueCyan)" stroke-width="',
+                Strings.toString(wideStrokeWidth),
+                '" filter="url(#blur)" opacity="0.5"/>',
                 "</g>"
             );
     }
 
-    // === CRISP LAYER (no filter) ===
+    // === MEDIUM GLOW LAYER ===
+    function _createMediumGlowLayer(
+        uint16 x,
+        uint16 y,
+        uint8 size,
+        uint256 seed
+    ) internal pure returns (string memory) {
+        uint8 strokeWidth = _getStrokeWidth(size);
+        uint8 mediumStrokeWidth = strokeWidth;
+        if (strokeWidth <= 5) {
+            mediumStrokeWidth = strokeWidth * 2;
+        } else {
+            mediumStrokeWidth = 10;
+        }
+
+        string memory rotation = _getRotation(seed);
+        uint8 quarter = size >= 4 ? size / 4 : 1;
+        uint8 half = size >= 2 ? size / 2 : 1;
+
+        return
+            string.concat(
+                '<g transform="translate(',
+                Strings.toString(x),
+                ",",
+                Strings.toString(y),
+                ") rotate(",
+                rotation,
+                ')">',
+                '<polygon points="0,-',
+                Strings.toString(quarter),
+                " ",
+                Strings.toString(half),
+                ",0 0,",
+                Strings.toString(quarter),
+                " -",
+                Strings.toString(half),
+                ',0" fill="none" stroke="url(#blueCyan)" stroke-width="',
+                Strings.toString(mediumStrokeWidth),
+                '" filter="url(#blur)" opacity="0.7"/>',
+                "</g>"
+            );
+    }
+
+    // === CRISP LAYER ===
     function _createCrispLayer(
         uint16 x,
         uint16 y,
         uint8 size,
         uint256 seed
     ) internal pure returns (string memory) {
-        string memory rotation = _getRotation(seed);
         uint8 strokeWidth = _getStrokeWidth(size);
-
-        // Ensure minimum values for polygon calculations
+        string memory rotation = _getRotation(seed);
         uint8 quarter = size >= 4 ? size / 4 : 1;
         uint8 half = size >= 2 ? size / 2 : 1;
 
@@ -140,113 +167,77 @@ contract BlueDiamonds is IBlueDiamonds {
                 Strings.toString(quarter),
                 " -",
                 Strings.toString(half),
-                ',0" fill="none" stroke="#44DDFF" stroke-width="',
+                ',0" fill="none" stroke="url(#blueCyan)" stroke-width="',
                 Strings.toString(strokeWidth),
                 '"/>',
                 "</g>"
             );
     }
 
-    // === WHITE HOT LAYER (pulsing opacity) ===
+    // === WHITE HOT LAYER ===
     function _createWhiteHotLayer(
         uint16 x,
         uint16 y,
         uint8 size,
-        uint256 seed
+        uint256 seed,
+        bool enablePulse
     ) internal pure returns (string memory) {
         string memory rotation = _getRotation(seed);
-        uint8 strokeWidth = _getStrokeWidth(size);
-
-        // Ensure minimum values for polygon calculations
         uint8 quarter = size >= 4 ? size / 4 : 1;
         uint8 half = size >= 2 ? size / 2 : 1;
 
-        return
-            string.concat(
-                '<g transform="translate(',
-                Strings.toString(x),
-                ",",
-                Strings.toString(y),
-                ") rotate(",
-                rotation,
-                ')">',
-                '<polygon points="0,-',
-                Strings.toString(quarter),
-                " ",
-                Strings.toString(half),
-                ",0 0,",
-                Strings.toString(quarter),
-                " -",
-                Strings.toString(half),
-                ',0" fill="none" stroke="white" stroke-width="',
-                Strings.toString(strokeWidth),
-                '" filter="url(#blur)" stroke-opacity="0.4">',
-                '<animate attributeName="opacity" values="0;0.6;0" dur="1s" repeatCount="indefinite"/>',
-                "</polygon>",
-                "</g>"
-            );
+        string memory baseDiamond = string.concat(
+            '<g transform="translate(',
+            Strings.toString(x),
+            ",",
+            Strings.toString(y),
+            ") rotate(",
+            rotation,
+            ')">',
+            '<polygon points="0,-',
+            Strings.toString(quarter),
+            " ",
+            Strings.toString(half),
+            ",0 0,",
+            Strings.toString(quarter),
+            " -",
+            Strings.toString(half),
+            ',0" fill="none" stroke="white" stroke-width="1" filter="url(#blur)" opacity="0.9"'
+        );
+
+        if (enablePulse) {
+            return
+                string.concat(
+                    baseDiamond,
+                    ">",
+                    '<animate attributeName="opacity" values="0.3;0.9;0.3" dur="3s" repeatCount="indefinite"/>',
+                    '<animate attributeName="stroke-width" values="0.5;2;0.5" dur="3s" repeatCount="indefinite"/>',
+                    "</polygon>",
+                    "</g>"
+                );
+        } else {
+            return string.concat(baseDiamond, "/>", "</g>");
+        }
     }
 
     // === UTILITY FUNCTIONS ===
+    function _getStrokeWidth(uint8 size) internal pure returns (uint8) {
+        // Same responsive logic as upgraded red circles
+        if (size < 15) return 2;
+
+        uint256 calculation = (uint256(size) * 4) / 60;
+        if (calculation < 2) return 2;
+        if (calculation > 10) return 10;
+        return uint8(calculation);
+    }
+
     function _getRotation(uint256 seed) internal pure returns (string memory) {
-        // Simple safe rotation - just return "0" for now to test
+        // Safe rotation calculation
         uint256 safeSeed = seed % 61; // 0-60 range
         if (safeSeed <= 30) {
             return Strings.toString(safeSeed); // 0 to 30
         } else {
             return string.concat("-", Strings.toString(61 - safeSeed)); // -30 to -1
         }
-    }
-
-    function _getStrokeWidth(uint8 size) internal pure returns (uint8) {
-        // Ensure size is large enough to avoid division issues
-        if (size < 15) return 2; // Minimum stroke width
-
-        uint256 calculation = (uint256(size) * 4) / 60;
-        if (calculation < 2) return 2;
-        if (calculation > 6) return 6;
-        return uint8(calculation);
-    }
-
-    function _intToString(int256 value) internal pure returns (string memory) {
-        if (value == 0) return "0";
-
-        bool negative = value < 0;
-        uint256 temp;
-
-        // Safe conversion to avoid underflow
-        if (negative) {
-            // Check for minimum int256 value to avoid overflow
-            if (value == type(int256).min) {
-                return
-                    "-57896044618658097711785492504343953926634992332820282019728792003956564819968";
-            }
-            temp = uint256(-value);
-        } else {
-            temp = uint256(value);
-        }
-
-        uint256 digits;
-        uint256 tempValue = temp;
-
-        while (tempValue != 0) {
-            digits++;
-            tempValue /= 10;
-        }
-
-        bytes memory buffer = new bytes(negative ? digits + 1 : digits);
-        uint256 index = buffer.length;
-
-        while (temp != 0) {
-            index--;
-            buffer[index] = bytes1(uint8(48 + (temp % 10)));
-            temp /= 10;
-        }
-
-        if (negative) {
-            buffer[0] = "-";
-        }
-
-        return string(buffer);
     }
 }
