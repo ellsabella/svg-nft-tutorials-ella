@@ -72,25 +72,6 @@ contract OnChainArt is ERC721 {
             );
     }
 
-    // function _generateNeonPortal(
-    //     uint256 tokenId
-    // ) internal view returns (string memory) {
-    //     // Fixed center position and size for now
-    //     uint16 centerX = 720;
-    //     uint16 centerY = 720;
-    //     uint16 portalSize = 380;
-    //     bool enablePulse = (tokenId % 2) == 0; // 33% chance of pulsing
-
-    //     return
-    //         neonPortal.createNeonPortal(
-    //             centerX,
-    //             centerY,
-    //             portalSize,
-    //             tokenId,
-    //             enablePulse
-    //         );
-    // }
-
     function _generateNeonPortal(
         uint256 tokenId
     ) internal view returns (string memory) {
