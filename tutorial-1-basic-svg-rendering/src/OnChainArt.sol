@@ -78,7 +78,7 @@ contract OnChainArt is ERC721 {
         // Fixed center position and size for now
         uint16 centerX = 720;
         uint16 centerY = 720;
-        uint8 portalSize = 80; // CHANGED: uint8 instead of uint16
+        uint8 portalSize = 120; // CHANGED: uint8 instead of uint16
         bool enablePulse = (tokenId % 3) == 0; // 33% chance of pulsing
 
         return
@@ -242,9 +242,9 @@ contract OnChainArt is ERC721 {
         if (i == 0) return ("#FFFF00", "#FF00FF", "#FFFF00");
         if (i == 1) return ("#FF0000", "#FFFF00", "#00FF00");
         if (i == 2) return ("#FF0000", "#00FFFF", "#FFFF00");
-        if (i == 3) return ("#FF0000", "#00FFFF", "#00FF00");
+        if (i == 3) return ("#FF0000", "#00FF00", "#00FF00");
         if (i == 4) return ("#00FFFF", "#FF00FF", "#FFFF00");
-        return ("#00FFFF", "#FFFF00", "#00FF00");
+        return ("#00FFFF", "#00FF00", "#FF00FF");
     }
 
     function renderSVG(uint256 id) external view returns (string memory) {
