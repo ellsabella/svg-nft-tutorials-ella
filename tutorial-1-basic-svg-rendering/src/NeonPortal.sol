@@ -2,6 +2,8 @@
 pragma solidity ^0.8.26;
 
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
+import {IVisualCore} from "./VisualCore.sol";
+import {FontStore} from "./FontStore.sol";
 
 interface INeonPortal {
     function createNeonPortal(
@@ -9,56 +11,71 @@ interface INeonPortal {
         uint16 y,
         uint8 size,
         uint256 seed,
-        bool enablePulse
-    ) external pure returns (string memory);
+        bool enablePulse // Add parameter
+    ) external view returns (string memory); // Change to view
 }
 
 contract NeonPortal is INeonPortal {
+    IVisualCore public immutable visualCore; // ➊  stored reference
+
+    constructor(address core) {
+        visualCore = IVisualCore(core);
+    }
+
     function createNeonPortal(
         uint16 x,
         uint16 y,
         uint8 size,
         uint256 seed,
         bool enablePulse
-    ) external pure override returns (string memory) {
+    ) external view override returns (string memory) {
         if (size < 20) size = 20;
-
-        // 50% chance for glitch effect
         bool enableGlitch = (seed % 2) == 0;
+
+        string memory filterId = string.concat(
+            "glitch",
+            Strings.toString(seed % 10000)
+        );
 
         return
             string.concat(
-                _createDefs(seed, enableGlitch),
                 "<g>",
+                enableGlitch
+                    ? string.concat(
+                        "<defs>",
+                        _createGlitchFilter(seed, filterId),
+                        _createGlitchBlurFilter(seed, filterId),
+                        "</defs>"
+                    )
+                    : "",
                 _createBokeh(x, y, size, seed),
-                _createRings(x, y, size, enablePulse, enableGlitch),
+                _createTextLayer(x, y, size, seed),
+                _createRings(x, y, size, enablePulse, enableGlitch, filterId),
                 "</g>"
             );
     }
 
-    function _createDefs(
-        uint256 seed,
-        bool includeGlitch
-    ) internal pure returns (string memory) {
-        string memory baseDefs = string.concat(
-            "<defs>",
-            '<linearGradient id="ring"><stop offset="0" stop-color="#00FFFF"/><stop offset="1" stop-color="#FF00FF"/></linearGradient>',
-            '<radialGradient id="b1"><stop offset="0" stop-color="#004080" stop-opacity="0.3"/><stop offset="0.6" stop-color="#002040" stop-opacity="0.15"/><stop offset="1" stop-color="#000000" stop-opacity="0.02"/></radialGradient>',
-            '<radialGradient id="b2"><stop offset="0" stop-color="#800040" stop-opacity="0.25"/><stop offset="0.7" stop-color="#400020" stop-opacity="0.1"/><stop offset="1" stop-color="#000000" stop-opacity="0.01"/></radialGradient>',
-            '<radialGradient id="b3"><stop offset="0" stop-color="#408080" stop-opacity="0.2"/><stop offset="0.8" stop-color="#204040" stop-opacity="0.08"/><stop offset="1" stop-color="#000000" stop-opacity="0.005"/></radialGradient>'
-        );
+    function _createTextLayer(
+        uint16 x,
+        uint16 y,
+        uint8 size,
+        uint256 seed
+    ) internal view returns (string memory) {
+        string memory randomText = visualCore.generateRandomText(seed, 8);
 
-        if (includeGlitch) {
-            return
-                string.concat(
-                    baseDefs,
-                    _createGlitchFilter(seed),
-                    _createGlitchBlurFilter(seed), // Combined filter
-                    "</defs>"
-                );
-        } else {
-            return string.concat(baseDefs, "</defs>");
-        }
+        uint16 textX = x > 50 ? x - 30 : x + 30;
+        uint16 textY = y + 10;
+
+        return
+            string.concat(
+                '<text x="',
+                Strings.toString(textX),
+                '" y="',
+                Strings.toString(textY),
+                '" style="font-family:f,monospace;font-size:12px;fill:black;opacity:0.6">', // Try inline style instead of class
+                randomText,
+                "</text>"
+            );
     }
 
     /// @dev Pick a 3 – 6 s duration string from the seed
@@ -68,13 +85,16 @@ contract NeonPortal is INeonPortal {
     }
 
     function _createGlitchBlurFilter(
-        uint256 seed
+        uint256 seed,
+        string memory filterId
     ) internal pure returns (string memory) {
         string memory dur = _animDur(seed);
 
         return
             string.concat(
-                '<filter id="glitchBlur" x="-25%" y="-25%" width="150%" height="150%">',
+                '<filter id="',
+                filterId,
+                'Blur" x="-25%" y="-25%" width="150%" height="150%">',
                 /* —— glow first —— */
                 '<feGaussianBlur in="SourceGraphic" stdDeviation="5" result="blurred"/>',
                 /* —— static bar mask —— */
@@ -104,13 +124,16 @@ contract NeonPortal is INeonPortal {
     }
 
     function _createGlitchFilter(
-        uint256 seed
+        uint256 seed,
+        string memory filterId
     ) internal pure returns (string memory) {
         string memory dur = _animDur(seed);
 
         return
             string.concat(
-                '<filter id="glitchShift" x="-25%" y="-25%" width="150%" height="150%">',
+                '<filter id="',
+                filterId,
+                'Shift" x="-25%" y="-25%" width="150%" height="150%">',
                 /* —— static bar mask —— */
                 '<feTurbulence type="turbulence" baseFrequency="0.0 ',
                 Strings.toString(12 + (seed % 21)),
@@ -245,22 +268,24 @@ contract NeonPortal is INeonPortal {
         uint16 y,
         uint8 size,
         bool pulse,
-        bool glitch
+        bool glitch,
+        string memory filterId
     ) internal pure returns (string memory) {
         uint8 sw = _strokeWidth(size);
 
-        // Use combined filter for glitch (blur + glitch), or just blur for normal
         string memory glowFilter = glitch
-            ? ' filter="url(#glitchBlur)"'
+            ? string.concat(' filter="url(#', filterId, 'Blur)"') // Use unique ID
             : ' filter="url(#blur)"';
-        string memory crispFilter = glitch ? ' filter="url(#glitchShift)"' : "";
+        string memory crispFilter = glitch
+            ? string.concat(' filter="url(#', filterId, 'Shift)"') // Use unique ID
+            : "";
 
         return
             string.concat(
                 _ring(x, y, size, sw <= 5 ? sw * 3 : 15, "0.5", glowFilter),
                 _ring(x, y, size, sw <= 5 ? sw * 2 : 10, "0.7", glowFilter),
                 _ring(x, y, size, sw, "1", crispFilter),
-                _highlight(x, y, size, pulse, glitch)
+                _highlight(x, y, size, pulse, glitch, filterId)
             );
     }
 
@@ -295,7 +320,8 @@ contract NeonPortal is INeonPortal {
         uint16 y,
         uint8 size,
         bool pulse,
-        bool glitch
+        bool glitch,
+        string memory filterId
     ) internal pure returns (string memory) {
         string memory base = string.concat(
             '<circle cx="',
@@ -305,7 +331,7 @@ contract NeonPortal is INeonPortal {
             '" r="',
             Strings.toString(size),
             '" fill="none" stroke="white" stroke-width="2" opacity="0.9"',
-            glitch ? ' filter="url(#glitchShift)"' : ""
+            glitch ? string.concat(' filter="url(#', filterId, 'Shift)"') : ""
         );
 
         return

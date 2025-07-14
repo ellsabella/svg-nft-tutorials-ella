@@ -26,7 +26,7 @@ contract OnChainArtTest is AbstractTest {
         blueDiamonds = new BlueDiamonds();
         greenSquares = new GreenSquares();
         basicShapes = new BasicShapes();
-        neonPortal = new NeonPortal();
+        neonPortal = new NeonPortal(address(visualCore));
 
         // 2. Deploy main orchestrator with all contract addresses
         renderer = new OnChainArt(
@@ -51,7 +51,7 @@ contract OnChainArtTest is AbstractTest {
 
     // Optional: Test individual contracts
     function testVisualCore() public view {
-        string memory filters = visualCore.createAllFilters();
+        string memory filters = visualCore.createAllFilters(123);
         require(bytes(filters).length > 0, "Filters should render");
 
         string memory background = visualCore.generateBackground(
@@ -161,7 +161,7 @@ contract OnChainArtTest is AbstractTest {
             720,
             80,
             12345,
-            false // no pulse
+            false
         );
         require(bytes(portal).length > 0, "Neon portal should render");
 
@@ -170,7 +170,7 @@ contract OnChainArtTest is AbstractTest {
             720,
             80,
             12345,
-            true // with pulse
+            true
         );
         require(
             bytes(pulsingPortal).length > 0,

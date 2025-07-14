@@ -41,14 +41,29 @@ contract OnChainArt is ERC721 {
         _safeMint(to, id);
     }
 
+    // function _svg(uint256 tokenId) internal view returns (string memory) {
+    //     (string memory colorA, string memory colorB, ) = _palette(tokenId);
+
+    //     return
+    //         string.concat(
+    //             '<svg xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMinYMin meet" viewBox="0 0 1440 1440">',
+    //             visualCore.createAllFilters(tokenId),
+    //             visualCore.generateTextStyle(colorA, colorB),
+    //             visualCore.generateBackground(tokenId, colorA),
+    //             visualCore.createFrames(colorA, colorB),
+    //             _generateAllShapes(tokenId),
+    //             "</svg>"
+    //         );
+    // }
+
     function _svg(uint256 tokenId) internal view returns (string memory) {
         (string memory colorA, string memory colorB, ) = _palette(tokenId);
 
         return
             string.concat(
                 '<svg xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMinYMin meet" viewBox="0 0 1440 1440">',
-                visualCore.createAllFilters(),
-                visualCore.generateTextStyle(colorA, colorB),
+                visualCore.createAllFilters(tokenId),
+                visualCore.generateTextStyle(colorA, colorB), // THIS LINE IS CRITICAL
                 visualCore.generateBackground(tokenId, colorA),
                 visualCore.createFrames(colorA, colorB),
                 _generateAllShapes(tokenId),
