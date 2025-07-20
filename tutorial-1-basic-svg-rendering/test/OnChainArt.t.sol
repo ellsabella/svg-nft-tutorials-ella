@@ -156,10 +156,11 @@ contract OnChainArtTest is AbstractTest {
     }
 
     function testNeonPortal() public view {
+        // FIXED: Changed uint8 80 to uint16 400 (within our new range)
         string memory portal = neonPortal.createNeonPortal(
             720,
             720,
-            80,
+            uint16(400), // CHANGED: explicit uint16 cast and larger size
             12345,
             false
         );
@@ -168,7 +169,7 @@ contract OnChainArtTest is AbstractTest {
         string memory pulsingPortal = neonPortal.createNeonPortal(
             720,
             720,
-            80,
+            uint16(500), // CHANGED: explicit uint16 cast and larger size
             12345,
             true
         );
@@ -201,7 +202,7 @@ contract OnChainArtTest is AbstractTest {
             "BasicShapes not connected"
         );
         require(
-            address(renderer.neonPortal()) == address(neonPortal), // ADD THIS LINE
+            address(renderer.neonPortal()) == address(neonPortal),
             "NeonPortal not connected"
         );
     }
