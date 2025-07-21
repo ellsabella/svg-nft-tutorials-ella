@@ -56,7 +56,8 @@ contract OnChainArtTest is AbstractTest {
 
         string memory background = visualCore.generateBackground(
             12345,
-            "#FF0000"
+            "#FF0000",
+            "#00FF00"
         );
         require(bytes(background).length > 0, "Background should render");
 

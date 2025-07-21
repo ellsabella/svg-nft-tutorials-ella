@@ -8,11 +8,12 @@ import {FontStore} from "./FontStore.sol";
 interface IVisualCore {
     function createAllFilters(
         uint256 seed
-    ) external pure returns (string memory); // Add seed parameter
+    ) external pure returns (string memory);
 
     function generateBackground(
         uint256 tokenId,
-        string memory colorA
+        string memory colorA,
+        string memory colorB
     ) external pure returns (string memory);
 
     function createFrames(
@@ -25,7 +26,6 @@ interface IVisualCore {
         string memory colorB
     ) external pure returns (string memory);
 
-    // Add the new text function to interface
     function generateRandomText(
         uint256 seed,
         uint8 length
@@ -149,25 +149,128 @@ contract VisualCore is IVisualCore {
             );
     }
 
-    // === BACKGROUND ===
     function generateBackground(
         uint256 tokenId,
-        string memory colorA
+        string memory colorA,
+        string memory colorB
     ) external pure override returns (string memory) {
-        // ASCII background commented out - keeping for future use
-        return _createMirroredBackground();
-        // return
-        //     string.concat(
-        //         _createMirroredBackground(),
-        //         _createOptimizedTextBackground(tokenId, colorA)
-        //     );
+        return _createMirroredBackground(colorA, colorB);
     }
 
-    function _createMirroredBackground() internal pure returns (string memory) {
+    function _createMirroredBackground(
+        string memory colorA,
+        string memory colorB
+    ) internal pure returns (string memory) {
         return
             string.concat(
                 '<rect width="1440" height="1440" fill="black"/>',
+                _createGrid(colorA),
+                _createTestText(colorB), // Pass colorB to text function
                 '<rect width="1440" height="1440" fill="none" stroke="#333" stroke-width="1" opacity="0.2"/>'
+            );
+    }
+
+    function _createTestText(
+        string memory colorB
+    ) internal pure returns (string memory) {
+        string memory textCluster = _createTextCluster(colorB);
+
+        return
+            string.concat(
+                "<g>",
+                textCluster,
+                "</g>",
+                '<g transform="translate(200,150)">',
+                textCluster,
+                "</g>",
+                '<g transform="translate(-180,-200)">',
+                textCluster,
+                "</g>",
+                '<g transform="scale(-1,1) translate(-1440,0)">',
+                textCluster,
+                "</g>",
+                '<g transform="scale(1,-1) translate(0,-1440)">',
+                textCluster,
+                "</g>",
+                '<g transform="rotate(90 720 720)">',
+                textCluster,
+                "</g>"
+            );
+    }
+
+    function _createGrid(
+        string memory colorA
+    ) internal pure returns (string memory) {
+        // Create only top-left quadrant (720x720), then mirror
+        string memory quadrantGrid = "";
+
+        // Generate lines for top-left quadrant only
+        for (uint16 i = 30; i <= 720; i += 30) {
+            // Vertical line
+            quadrantGrid = string.concat(
+                quadrantGrid,
+                '<line x1="',
+                Strings.toString(i),
+                '" y1="0" x2="',
+                Strings.toString(i),
+                '" y2="720" stroke="',
+                colorA,
+                '" stroke-width="1" opacity="0.7" filter="url(#blur)"/>'
+            );
+            // Horizontal line
+            quadrantGrid = string.concat(
+                quadrantGrid,
+                '<line x1="0" y1="',
+                Strings.toString(i),
+                '" x2="720" y2="',
+                Strings.toString(i),
+                '" stroke="',
+                colorA,
+                '" stroke-width="1" opacity="0.7" filter="url(#blur)"/>'
+            );
+        }
+
+        return
+            string.concat(
+                "<g>",
+                quadrantGrid,
+                "</g>",
+                '<g transform="scale(-1,1) translate(-1440,0)">',
+                quadrantGrid,
+                "</g>",
+                '<g transform="scale(1,-1) translate(0,-1440)">',
+                quadrantGrid,
+                "</g>",
+                '<g transform="scale(-1,-1) translate(-1440,-1440)">',
+                quadrantGrid,
+                "</g>"
+            );
+    }
+
+    function _createTextCluster(
+        string memory colorB
+    ) internal pure returns (string memory) {
+        string memory baseText = string.concat(
+            '<text x="600" y="650" class="f" font-size="80" fill="',
+            colorB,
+            '" opacity="0.1" filter="url(#blur)">ZRBBZR</text>'
+        );
+
+        return
+            string.concat(
+                baseText,
+                '<g transform="translate(240,140)">',
+                baseText,
+                "</g>",
+                '<g transform="translate(-120,280)">',
+                baseText,
+                "</g>",
+                '<g transform="rotate(90 720 720)">',
+                baseText,
+                "</g>",
+                '<g transform="rotate(180 720 720)">',
+                baseText,
+                "</g>"
             );
     }
 

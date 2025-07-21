@@ -63,7 +63,8 @@ contract OnChainArt is ERC721 {
         string memory textStyle = visualCore.generateTextStyle(colorA, colorB);
         string memory background = visualCore.generateBackground(
             tokenId,
-            colorA
+            colorA,
+            colorB
         );
         string memory frames = visualCore.createFrames(colorA, colorB);
         string memory shapes = _generateAllShapes(tokenId);
