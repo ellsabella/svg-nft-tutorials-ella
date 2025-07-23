@@ -3,7 +3,6 @@ pragma solidity ^0.8.26;
 
 import {Random, RandomCtx} from "./utils/Random.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
-import {FontStore} from "./FontStore.sol";
 
 interface IVisualCore {
     function createAllFilters(
@@ -16,10 +15,7 @@ interface IVisualCore {
         string memory colorB
     ) external pure returns (string memory);
 
-    function createFrames(
-        string memory colorA,
-        string memory colorB
-    ) external pure returns (string memory);
+    function createFrames() external pure returns (string memory);
 
     function generateTextStyle(
         string memory colorA,
@@ -33,7 +29,11 @@ interface IVisualCore {
 }
 
 contract VisualCore is IVisualCore {
-    bytes constant CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789";
+    string internal constant CF = 'class="f"';
+    string internal constant BLR = 'filter="url(#blur)"';
+    string internal constant REP = 'repeatCount="indefinite"';
+    string private constant FONT_BASE64 =
+        "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";
 
     function createAllFilters(
         uint256 seed
@@ -43,88 +43,21 @@ contract VisualCore is IVisualCore {
                 "<defs>",
                 _createOriginalBlurFilter(),
                 _createNeonPortalGradients(),
-                // _createDynamicGlitchFilters(seed),
-                _createFrameGradients(), // MOVE frame gradients here
+                _createFrameGradients(seed), // Inline frame gradients
                 "</defs>"
-            );
-    }
-
-    function generateRandomText(
-        uint256 seed,
-        uint8 length
-    ) external pure override returns (string memory) {
-        bytes memory chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-        bytes memory text = new bytes(length);
-
-        uint256 s = seed;
-        for (uint8 i = 0; i < length; i++) {
-            text[i] = chars[s % 36];
-            s = s >> 4;
-        }
-
-        return string(text);
-    }
-
-    function _createDynamicGlitchFilters(
-        uint256 seed
-    ) internal pure returns (string memory) {
-        return
-            string.concat(
-                // Glitch shift filter with dynamic seed
-                '<filter id="glitchShift" x="-25%" y="-25%" width="150%" height="150%">',
-                '<feTurbulence type="turbulence" baseFrequency="0.0 ',
-                Strings.toString(12 + (seed % 21)), // 12-32 range
-                'e-2" numOctaves="1" seed="',
-                Strings.toString(seed % 10000),
-                '" result="raw"/>',
-                '<feComponentTransfer in="raw" result="mask">',
-                '<feFuncR type="table" tableValues="0 0 1 1"/>',
-                "</feComponentTransfer>",
-                '<feMorphology in="mask" operator="dilate" radius="3" result="bands"/>',
-                '<feDisplacementMap in="SourceGraphic" in2="bands" scale="28" ',
-                'xChannelSelector="R" yChannelSelector="R" result="distorted"/>',
-                '<feOffset in="distorted" dx="2" dy="0" result="red"/>',
-                '<feOffset in="distorted" dx="-2" dy="0" result="cyan"/>',
-                '<feComposite in="red" in2="cyan" operator="lighter" result="merged"/>',
-                '<feMerge><feMergeNode in="merged"/></feMerge>',
-                "</filter>",
-                // Glitch blur filter with dynamic seed
-                '<filter id="glitchBlur" x="-25%" y="-25%" width="150%" height="150%">',
-                '<feGaussianBlur in="SourceGraphic" stdDeviation="5" result="blurred"/>',
-                '<feTurbulence type="turbulence" baseFrequency="0.0 ',
-                Strings.toString(12 + ((seed * 7919) % 21)), // Different seed calculation
-                'e-2" numOctaves="1" seed="',
-                Strings.toString((seed * 2654435761) % 10000), // Large prime for variation
-                '" result="raw"/>',
-                '<feComponentTransfer in="raw" result="mask">',
-                '<feFuncR type="table" tableValues="0 0 1 1"/>',
-                "</feComponentTransfer>",
-                '<feMorphology in="mask" operator="dilate" radius="3" result="bands"/>',
-                '<feDisplacementMap in="blurred" in2="bands" scale="28" ',
-                'xChannelSelector="R" yChannelSelector="R" result="distBlur"/>',
-                '<feOffset in="distBlur" dx="2" dy="0" result="r"/>',
-                '<feOffset in="distBlur" dx="-2" dy="0" result="c"/>',
-                '<feComposite in="r" in2="c" operator="lighter" result="out"/>',
-                '<feMerge><feMergeNode in="out"/></feMerge>',
-                "</filter>"
             );
     }
 
     function _createOriginalBlurFilter() internal pure returns (string memory) {
         return
             string.concat(
-                '<filter id="blur" filterUnits="userSpaceOnUse" ',
-                'x="-720" y="-720" width="2160" height="2160">',
-                // Multi-layer base glow
+                '<filter id="blur" filterUnits="userSpaceOnUse" x="-720" y="-720" width="2160" height="2160">',
                 '<feGaussianBlur in="SourceGraphic" stdDeviation="5" result="tight"/>',
-                '<feColorMatrix in="tight" type="matrix" values="',
-                '6 0 0 0 0 0 6 0 0 0 0 0 6 0 0 0 0 0 1.0 0" result="tightColored"/>',
+                '<feColorMatrix in="tight" type="matrix" values="6 0 0 0 0 0 6 0 0 0 0 0 6 0 0 0 0 0 1.0 0" result="tightColored"/>',
                 '<feGaussianBlur in="SourceGraphic" stdDeviation="15" result="medium"/>',
-                '<feColorMatrix in="medium" type="matrix" values="',
-                '4 0 0 0 0 0 4 0 0 0 0 0 4 0 0 0 0 0 0.8 0" result="mediumColored"/>',
+                '<feColorMatrix in="medium" type="matrix" values="4 0 0 0 0 0 4 0 0 0 0 0 4 0 0 0 0 0 0.8 0" result="mediumColored"/>',
                 '<feGaussianBlur in="SourceGraphic" stdDeviation="35" result="wide"/>',
-                '<feColorMatrix in="wide" type="matrix" values="',
-                '2 0 0 0 0 0 2 0 0 0 0 0 2 0 0 0 0 0 0.6 0" result="wideColored"/>',
+                '<feColorMatrix in="wide" type="matrix" values="2 0 0 0 0 0 2 0 0 0 0 0 2 0 0 0 0 0 0.6 0" result="wideColored"/>',
                 "<feMerge>",
                 '<feMergeNode in="wideColored"/>',
                 '<feMergeNode in="mediumColored"/>',
@@ -154,233 +87,185 @@ contract VisualCore is IVisualCore {
         string memory colorA,
         string memory colorB
     ) external pure override returns (string memory) {
-        return _createMirroredBackground(colorA, colorB);
+        return _createMirroredBackground(colorA, colorB, tokenId);
     }
 
-    function _createMirroredBackground(
-        string memory colorA,
-        string memory colorB
+    //_TEXT
+    function _createSingleText(
+        int16 x,
+        int16 y,
+        uint8 fontSize,
+        string memory fill,
+        string memory opacity,
+        string memory animOpacity,
+        string memory content
     ) internal pure returns (string memory) {
         return
             string.concat(
-                '<rect width="1440" height="1440" fill="black"/>',
-                _createGrid(colorA),
-                _createTestText(colorB), // Pass colorB to text function
-                '<rect width="1440" height="1440" fill="none" stroke="#333" stroke-width="1" opacity="0.2"/>'
+                '<text x="',
+                _intToString(x),
+                '" y="',
+                _intToString(y),
+                '" ',
+                CF,
+                ' font-size="',
+                Strings.toString(fontSize),
+                '" fill="',
+                fill,
+                '" opacity="',
+                opacity,
+                '" ',
+                BLR,
+                ">",
+                // '<animate attributeName="opacity" values="',
+                // animOpacity,
+                // '" dur="8s" ',
+                // REP,
+                // "/>",
+                content,
+                "</text>"
             );
     }
 
-    function _createTestText(
-        string memory colorB
+    function _createTextCluster(
+        string memory colorB,
+        int16 baseX,
+        int16 baseY,
+        uint256 seed
     ) internal pure returns (string memory) {
-        string memory textCluster = _createTextCluster(colorB);
+        RandomCtx memory ctx = Random.initCtx(seed + 77777);
 
-        return
-            string.concat(
-                "<g>",
-                textCluster,
-                "</g>",
-                '<g transform="translate(200,150)">',
-                textCluster,
-                "</g>",
-                '<g transform="translate(-180,-200)">',
-                textCluster,
-                "</g>",
-                '<g transform="scale(-1,1) translate(-1440,0)">',
-                textCluster,
-                "</g>",
-                '<g transform="scale(1,-1) translate(0,-1440)">',
-                textCluster,
-                "</g>",
-                '<g transform="rotate(90 720 720)">',
-                textCluster,
+        string memory part1 = _createSingleText(
+            baseX + int16(Random.randRange(ctx, -150, 150)),
+            baseY + int16(Random.randRange(ctx, -120, 120)),
+            60 + uint8(Random.randInt(ctx) % 40),
+            colorB,
+            "0.1",
+            "0.1;0.29;0.1",
+            "GHZGHZ"
+        );
+
+        string memory part2 = _createSingleText(
+            baseX + int16(Random.randRange(ctx, -200, 200)),
+            baseY + int16(Random.randRange(ctx, -180, 180)),
+            50 + uint8(Random.randInt(ctx) % 50),
+            colorB,
+            "0.07",
+            "0.07;0.25;0.07",
+            "HZZGHH"
+        );
+
+        string memory part3 = _createSingleText(
+            baseX + int16(Random.randRange(ctx, -170, 170)),
+            baseY + int16(Random.randRange(ctx, -150, 150)),
+            70 + uint8(Random.randInt(ctx) % 30),
+            colorB,
+            "0.09",
+            "0.09;0.3;0.09",
+            "ZGHHZG"
+        );
+
+        return string.concat(part1, part2, part3);
+    }
+
+    function _createMirroredGroups(
+        string memory cluster,
+        uint256 seed
+    ) internal pure returns (string memory) {
+        RandomCtx memory ctx = Random.initCtx(seed + 99999);
+        uint256 choice = Random.randInt(ctx) % 2;
+
+        string memory output = string.concat(
+            '<g transform="scale(',
+            choice == 0 ? "-1,1" : "1,-1",
+            ") translate(",
+            choice == 0 ? "-1440,0" : "0,-1440",
+            ')">',
+            cluster,
+            "</g>"
+        );
+
+        int16[4] memory offsets = choice == 0
+            ? [int16(-300), int16(300), int16(0), int16(0)]
+            : [int16(0), int16(0), int16(-250), int16(250)];
+
+        int16[4] memory orthos = choice == 0
+            ? [int16(0), int16(0), int16(-250), int16(250)]
+            : [int16(-300), int16(300), int16(0), int16(0)];
+
+        for (uint8 i = 0; i < 4; i++) {
+            output = string.concat(
+                output,
+                '<g transform="translate(',
+                _intToString(offsets[i]),
+                ",",
+                _intToString(orthos[i]),
+                ')">',
+                cluster,
                 "</g>"
             );
+        }
+
+        return output;
     }
 
     function _createGrid(
         string memory colorA
     ) internal pure returns (string memory) {
-        // Create only top-left quadrant (720x720), then mirror
-        string memory quadrantGrid = "";
+        string memory lines = "";
 
-        // Generate lines for top-left quadrant only
         for (uint16 i = 30; i <= 720; i += 30) {
-            // Vertical line
-            quadrantGrid = string.concat(
-                quadrantGrid,
+            string memory iStr = Strings.toString(i);
+            string memory hLine = string.concat(
                 '<line x1="',
-                Strings.toString(i),
+                iStr,
                 '" y1="0" x2="',
-                Strings.toString(i),
+                iStr,
                 '" y2="720" stroke="',
                 colorA,
-                '" stroke-width="1" opacity="0.7" filter="url(#blur)"/>'
+                '" stroke-width="1" opacity="0.35" ',
+                // BLR,
+                "/>"
             );
-            // Horizontal line
-            quadrantGrid = string.concat(
-                quadrantGrid,
+            string
+                memory hAnim = '<animate attributeName="opacity" values="0.35;0.15;0.35" dur="8s" ';
+            string memory vLine = string.concat(
                 '<line x1="0" y1="',
-                Strings.toString(i),
+                iStr,
                 '" x2="720" y2="',
-                Strings.toString(i),
+                iStr,
                 '" stroke="',
                 colorA,
-                '" stroke-width="1" opacity="0.7" filter="url(#blur)"/>'
+                '" stroke-width="1" opacity="0.35" ',
+                // BLR,
+                "/>"
+            );
+            lines = string.concat(
+                lines,
+                hLine,
+                // hAnim,
+                REP,
+                "/>",
+                vLine,
+                // hAnim,
+                REP,
+                "/>"
             );
         }
 
+        string memory group = string.concat("<g>", lines, "</g>");
         return
             string.concat(
-                "<g>",
-                quadrantGrid,
-                "</g>",
+                group,
                 '<g transform="scale(-1,1) translate(-1440,0)">',
-                quadrantGrid,
+                group,
                 "</g>",
                 '<g transform="scale(1,-1) translate(0,-1440)">',
-                quadrantGrid,
+                group,
                 "</g>",
                 '<g transform="scale(-1,-1) translate(-1440,-1440)">',
-                quadrantGrid,
+                group,
                 "</g>"
-            );
-    }
-
-    function _createTextCluster(
-        string memory colorB
-    ) internal pure returns (string memory) {
-        string memory baseText = string.concat(
-            '<text x="600" y="650" class="f" font-size="80" fill="',
-            colorB,
-            '" opacity="0.1" filter="url(#blur)">ZRBBZR</text>'
-        );
-
-        return
-            string.concat(
-                baseText,
-                '<g transform="translate(240,140)">',
-                baseText,
-                "</g>",
-                '<g transform="translate(-120,280)">',
-                baseText,
-                "</g>",
-                '<g transform="rotate(90 720 720)">',
-                baseText,
-                "</g>",
-                '<g transform="rotate(180 720 720)">',
-                baseText,
-                "</g>"
-            );
-    }
-
-    // === FRAMES ===
-    function createFrames(
-        string memory colorA,
-        string memory colorB
-    ) external pure override returns (string memory) {
-        return
-            string.concat(
-                _createFrameGradientDefs(colorA, colorB),
-                _createOuterFrame(),
-                _createInnerFrame()
-            );
-    }
-
-    function _createFrameGradientDefs(
-        string memory colorA,
-        string memory colorB
-    ) internal pure returns (string memory) {
-        return
-            string.concat(
-                "<defs>",
-                // Outer frame gradient (B→A→B)
-                '<linearGradient id="outerFrameGrad" x1="0" y1="0" x2="1" y2="1">',
-                '<stop offset="0"   stop-color="',
-                colorB,
-                '"/>',
-                '<stop offset="0.5" stop-color="',
-                colorA,
-                '"/>',
-                '<stop offset="1"   stop-color="',
-                colorB,
-                '"/>',
-                '<animateTransform attributeName="gradientTransform" '
-                'type="rotate" values="0 0.5 0.5;360 0.5 0.5" dur="8s" '
-                'repeatCount="indefinite"/>',
-                "</linearGradient>",
-                // Inner frame gradient (A→B→A)
-                '<linearGradient id="innerFrameGrad" x1="0" y1="0" x2="1" y2="1">',
-                '<stop offset="0"   stop-color="',
-                colorA,
-                '"/>',
-                '<stop offset="0.5" stop-color="',
-                colorB,
-                '"/>',
-                '<stop offset="1"   stop-color="',
-                colorA,
-                '"/>',
-                '<animateTransform attributeName="gradientTransform" '
-                'type="rotate" values="360 0.5 0.5;0 0.5 0.5" dur="10s" '
-                'repeatCount="indefinite"/>',
-                "</linearGradient>",
-                "</defs>"
-            );
-    }
-
-    function _createFrameGradients() internal pure returns (string memory) {
-        return
-            string.concat(
-                // Outer frame gradient
-                '<linearGradient id="outerFrameGrad" x1="0" y1="0" x2="1" y2="1">',
-                '<stop offset="0" stop-color="var(--colorB)"/>',
-                '<stop offset="0.5" stop-color="var(--colorA)"/>',
-                '<stop offset="1" stop-color="var(--colorB)"/>',
-                '<animateTransform attributeName="gradientTransform" type="rotate" values="0 0.5 0.5;360 0.5 0.5" dur="8s" repeatCount="indefinite"/>',
-                "</linearGradient>",
-                // Inner frame gradient
-                '<linearGradient id="innerFrameGrad" x1="0" y1="0" x2="1" y2="1">',
-                '<stop offset="0" stop-color="var(--colorA)"/>',
-                '<stop offset="0.5" stop-color="var(--colorB)"/>',
-                '<stop offset="1" stop-color="var(--colorA)"/>',
-                '<animateTransform attributeName="gradientTransform" type="rotate" values="360 0.5 0.5;0 0.5 0.5" dur="10s" repeatCount="indefinite"/>',
-                "</linearGradient>"
-            );
-    }
-
-    // === OUTER FRAME (4 layers) ===
-    function _createOuterFrame() internal pure returns (string memory) {
-        return
-            string.concat(
-                // Wide glow layer
-                '<rect x="30" y="30" width="1380" height="1380" fill="none" stroke="url(#outerFrameGrad)" stroke-width="30" filter="url(#blur)" opacity="0.5"/>',
-                // Medium glow layer
-                '<rect x="30" y="30" width="1380" height="1380" fill="none" stroke="url(#outerFrameGrad)" stroke-width="20" filter="url(#blur)" opacity="0.7"/>',
-                // Crisp layer
-                '<rect x="30" y="30" width="1380" height="1380" fill="none" stroke="url(#outerFrameGrad)" stroke-width="10"/>',
-                // White hot layer (always pulsing)
-                '<rect x="30" y="30" width="1380" height="1380" fill="none" stroke="white" stroke-width="1" filter="url(#blur)" opacity="0.9">',
-                '<animate attributeName="opacity" values="0.3;0.9;0.3" dur="3s" repeatCount="indefinite"/>',
-                '<animate attributeName="stroke-width" values="0.5;3;0.5" dur="3s" repeatCount="indefinite"/>',
-                "</rect>"
-            );
-    }
-
-    // === INNER FRAME (4 layers) ===
-    function _createInnerFrame() internal pure returns (string memory) {
-        return
-            string.concat(
-                // Wide glow layer
-                '<rect x="60" y="60" width="1320" height="1320" fill="none" stroke="url(#innerFrameGrad)" stroke-width="30" filter="url(#blur)" opacity="0.5"/>',
-                // Medium glow layer
-                '<rect x="60" y="60" width="1320" height="1320" fill="none" stroke="url(#innerFrameGrad)" stroke-width="20" filter="url(#blur)" opacity="0.7"/>',
-                // Crisp layer
-                '<rect x="60" y="60" width="1320" height="1320" fill="none" stroke="url(#innerFrameGrad)" stroke-width="10"/>',
-                // White hot layer (always pulsing)
-                '<rect x="60" y="60" width="1320" height="1320" fill="none" stroke="white" stroke-width="1" filter="url(#blur)" opacity="0.9">',
-                '<animate attributeName="opacity" values="0.3;0.9;0.3" dur="3s" repeatCount="indefinite"/>',
-                '<animate attributeName="stroke-width" values="0.5;3;0.5" dur="3s" repeatCount="indefinite"/>',
-                "</rect>"
             );
     }
 
@@ -397,10 +282,222 @@ contract VisualCore is IVisualCore {
                 colorB,
                 ";}",
                 "@font-face{font-family:'f';src:url(data:font/woff2;base64,",
-                FontStore.fontBase64(),
+                FONT_BASE64,
                 ") format('woff2');}",
                 ".f{font-family:'f',monospace}",
                 "</style></defs>"
             );
+    }
+
+    function generateRandomText(
+        uint256 seed,
+        uint8 length
+    ) external pure override returns (string memory) {
+        bytes memory chars = "ZRB"; // Only the 3 working characters
+        bytes memory text = new bytes(length);
+
+        uint256 s = seed;
+        for (uint8 i = 0; i < length; i++) {
+            text[i] = chars[s % 3]; // Only 3 chars available
+            s = s >> 2; // Shift by 2 bits since we only have 3 options
+        }
+
+        return string(text);
+    }
+
+    function _createMirroredBackground(
+        string memory colorA,
+        string memory colorB,
+        uint256 seed
+    ) internal pure returns (string memory) {
+        return
+            string.concat(
+                '<rect width="1440" height="1440" fill="black"/>',
+                _createGrid(colorA),
+                _createTestText(colorB, seed)
+            );
+    }
+
+    function _createTestText(
+        string memory colorB,
+        uint256 seed
+    ) internal pure returns (string memory) {
+        RandomCtx memory ctx = Random.initCtx(seed + 88888);
+
+        int16 baseX = 720 + int16(Random.randRange(ctx, -300, 300));
+        int16 baseY = 720 + int16(Random.randRange(ctx, -300, 300));
+        int16 spread1X = int16(Random.randRange(ctx, -250, 250));
+        int16 spread1Y = int16(Random.randRange(ctx, -200, 200));
+
+        string memory textCluster = _createTextCluster(
+            colorB,
+            baseX,
+            baseY,
+            seed
+        );
+
+        // Cluster + one spread copy
+        string memory baseSpread = string.concat(
+            "<g>",
+            textCluster,
+            "</g>",
+            '<g transform="translate(',
+            _intToString(spread1X),
+            ",",
+            _intToString(spread1Y),
+            ')">',
+            textCluster,
+            "</g>"
+        );
+
+        // Inline mirror logic (was _createSelectiveMirrors)
+        uint256 mirrorChoice = Random.randInt(ctx) % 2;
+
+        string memory mirrors;
+        if (mirrorChoice == 0) {
+            // Horizontal emphasis
+            mirrors = string.concat(
+                '<g transform="scale(-1,1) translate(-1440,0)">',
+                textCluster,
+                "</g>",
+                '<g transform="translate(-300,0)">',
+                textCluster,
+                "</g>",
+                '<g transform="translate(300,0)">',
+                textCluster,
+                "</g>",
+                '<g transform="translate(0,-250)">',
+                textCluster,
+                "</g>",
+                '<g transform="translate(0,250)">',
+                textCluster,
+                "</g>"
+            );
+        } else {
+            // Vertical emphasis
+            mirrors = string.concat(
+                '<g transform="scale(1,-1) translate(0,-1440)">',
+                textCluster,
+                "</g>",
+                '<g transform="translate(0,-300)">',
+                textCluster,
+                "</g>",
+                '<g transform="translate(0,300)">',
+                textCluster,
+                "</g>",
+                '<g transform="translate(-250,0)">',
+                textCluster,
+                "</g>",
+                '<g transform="translate(250,0)">',
+                textCluster,
+                "</g>"
+            );
+        }
+
+        return string.concat(baseSpread, mirrors);
+    }
+
+    // === FRAMES ===
+    function createFrames()
+        external
+        pure
+        override
+        returns (
+            // string memory colorA,
+            // string memory colorB
+            string memory
+        )
+    {
+        return
+            string.concat(
+                _createFrame(30, 30, 1380, 1380, "outerFrameGrad"),
+                _createFrame(60, 60, 1320, 1320, "innerFrameGrad")
+            );
+    }
+
+    function _createFrame(
+        uint16 x,
+        uint16 y,
+        uint16 width,
+        uint16 height,
+        string memory gradientId
+    ) internal pure returns (string memory) {
+        string memory xStr = Strings.toString(x);
+        string memory yStr = Strings.toString(y);
+        string memory wStr = Strings.toString(width);
+        string memory hStr = Strings.toString(height);
+
+        string memory baseRect = string.concat(
+            '<rect x="',
+            xStr,
+            '" y="',
+            yStr,
+            '" width="',
+            wStr,
+            '" height="',
+            hStr,
+            '" fill="none" stroke="url(#',
+            gradientId
+        );
+
+        string memory layer1 = string.concat(
+            baseRect,
+            ')" stroke-width="30" filter="url(#blur)" opacity="0.5"/>'
+        );
+        string memory layer2 = string.concat(
+            baseRect,
+            ')" stroke-width="20" filter="url(#blur)" opacity="0.7"/>'
+        );
+        string memory layer3 = string.concat(
+            baseRect,
+            ')" stroke-width="10"/>'
+        );
+
+        string memory animRect = string.concat(
+            '<rect x="',
+            xStr,
+            '" y="',
+            yStr,
+            '" width="',
+            wStr,
+            '" height="',
+            hStr,
+            '" fill="none" stroke="white" stroke-width="1" filter="url(#blur)" opacity="0.9">',
+            '<animate attributeName="opacity" values="0.3;0.9;0.3" dur="3s" repeatCount="indefinite"/>',
+            '<animate attributeName="stroke-width" values="0.5;3;0.5" dur="3s" repeatCount="indefinite"/>',
+            "</rect>"
+        );
+
+        return string.concat(layer1, layer2, layer3, animRect);
+    }
+
+    function _createFrameGradients(
+        uint256 seed
+    ) internal pure returns (string memory) {
+        return
+            string.concat(
+                '<linearGradient id="outerFrameGrad" x1="0" y1="0" x2="1" y2="1">',
+                '<stop offset="0" stop-color="var(--colorB)"/>',
+                '<stop offset="0.5" stop-color="var(--colorA)"/>',
+                '<stop offset="1" stop-color="var(--colorB)"/>',
+                '<animateTransform attributeName="gradientTransform" type="rotate" values="0 0.5 0.5;360 0.5 0.5" dur="8s" repeatCount="indefinite"/>',
+                "</linearGradient>",
+                '<linearGradient id="innerFrameGrad" x1="0" y1="0" x2="1" y2="1">',
+                '<stop offset="0" stop-color="var(--colorA)"/>',
+                '<stop offset="0.5" stop-color="var(--colorB)"/>',
+                '<stop offset="1" stop-color="var(--colorA)"/>',
+                '<animateTransform attributeName="gradientTransform" type="rotate" values="360 0.5 0.5;0 0.5 0.5" dur="10s" repeatCount="indefinite"/>',
+                "</linearGradient>"
+            );
+    }
+
+    // Utility function to convert int to string (handles negative values)
+    function _intToString(int16 value) internal pure returns (string memory) {
+        if (value >= 0) {
+            return Strings.toString(uint256(int256(value)));
+        } else {
+            return
+                string.concat("-", Strings.toString(uint256(int256(-value))));
+        }
     }
 }

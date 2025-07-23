@@ -61,7 +61,8 @@ contract OnChainArtTest is AbstractTest {
         );
         require(bytes(background).length > 0, "Background should render");
 
-        string memory frames = visualCore.createFrames("#FF0000", "#00FF00");
+        // string memory frames = visualCore.createFrames("#FF0000", "#00FF00");
+        string memory frames = visualCore.createFrames();
         require(bytes(frames).length > 0, "Frames should render");
 
         string memory textStyle = visualCore.generateTextStyle(
