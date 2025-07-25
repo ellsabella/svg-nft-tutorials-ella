@@ -59,8 +59,10 @@ contract NeonPortal is INeonPortal {
                 y,
                 size,
                 seed,
-                enablePulse,
-                enableMovement,
+                false,
+                false, // No pulse in this case
+                // enablePulse,
+                // enableMovement,
                 centerX,
                 centerY
             );

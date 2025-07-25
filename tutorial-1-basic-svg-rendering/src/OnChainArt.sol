@@ -7,49 +7,31 @@ import {Base64} from "@openzeppelin/contracts/utils/Base64.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {QuadrantPlacement} from "./ShapePlacement.sol";
 import {VisualCore} from "./VisualCore.sol";
-import {RedCircles} from "./RedCircles.sol";
+import {CircularShapes} from "./CircularShapes.sol";
+import {CircleTypes} from "./CircleTypes.sol";
 import {BlueDiamonds} from "./BlueDiamonds.sol";
 import {GreenSquares} from "./GreenSquares.sol";
 import {BasicShapes} from "./BasicShapes.sol";
-import {NeonPortal} from "./NeonPortal.sol";
 
 contract OnChainArt is ERC721 {
     VisualCore public immutable visualCore;
-    RedCircles public immutable redCircles;
+    CircularShapes public immutable circularShapes;
     BlueDiamonds public immutable blueDiamonds;
     GreenSquares public immutable greenSquares;
     BasicShapes public immutable basicShapes;
-    NeonPortal public immutable neonPortal;
-
-    // Portal configuration constants
-    uint16 constant MIN_PORTAL_RADIUS = 300;
-    uint16 constant MAX_PORTAL_RADIUS = 900;
-    uint16 constant CENTER_X = 720;
-    uint16 constant CENTER_Y = 720;
-    uint16 constant CENTER_RADIUS = 720;
-
-    struct PortalConfig {
-        uint16 x;
-        uint16 y;
-        uint16 size;
-        bool enablePulse;
-        uint256 seed;
-    }
 
     constructor(
         address _visualCore,
-        address _redCircles,
+        address _circularShapes,
         address _blueDiamonds,
         address _greenSquares,
-        address _basicShapes,
-        address _neonPortal
+        address _basicShapes
     ) ERC721("On-chain Art", "ART") {
         visualCore = VisualCore(_visualCore);
-        redCircles = RedCircles(_redCircles);
+        circularShapes = CircularShapes(_circularShapes);
         blueDiamonds = BlueDiamonds(_blueDiamonds);
         greenSquares = GreenSquares(_greenSquares);
         basicShapes = BasicShapes(_basicShapes);
-        neonPortal = NeonPortal(_neonPortal);
     }
 
     function mint(address to, uint256 id) external {
@@ -66,9 +48,8 @@ contract OnChainArt is ERC721 {
             colorA,
             colorB
         );
-        // string memory frames = visualCore.createFrames(colorA, colorB);
         string memory frames = visualCore.createFrames();
-        string memory shapes = _generateAllShapes(tokenId);
+        string memory shapes = _generateAllShapes(tokenId, colorA, colorB);
 
         return
             string.concat(
@@ -83,61 +64,201 @@ contract OnChainArt is ERC721 {
     }
 
     function _generateAllShapes(
-        uint256 tokenId
+        uint256 tokenId,
+        string memory colorA,
+        string memory colorB
     ) internal view returns (string memory) {
         QuadrantPlacement.PlacementPlan memory plan = QuadrantPlacement
             .generatePlacementPlan(tokenId);
 
-        string memory red = _generateRedCircles(tokenId, plan);
-        string memory pink = _generatePinkSquares(tokenId, plan);
-        string memory portals = _generateNeonPortals(tokenId);
+        string memory redCircles = _generateRedCircles(
+            tokenId,
+            plan,
+            colorA,
+            colorB
+        );
+        string memory neonPortals = _generateNeonPortals(
+            tokenId,
+            colorA,
+            colorB
+        );
+        string memory pinkSquares = _generatePinkSquares(tokenId, plan);
+        string memory blueDiamonds = _generateBlueDiamonds(tokenId, plan);
+        string memory greenSquares = _generateGreenSquares(tokenId, plan);
 
-        return string.concat(red, pink, portals);
+        return
+            string.concat(
+                redCircles,
+                neonPortals,
+                pinkSquares,
+                blueDiamonds,
+                greenSquares
+            );
+    }
+
+    function _generateRedCircles(
+        uint256 tokenId,
+        QuadrantPlacement.PlacementPlan memory plan,
+        string memory colorA,
+        string memory colorB
+    ) internal view returns (string memory) {
+        RandomCtx memory ctx = Random.initCtx(tokenId + 12345);
+        QuadrantPlacement.ShapeConfig[] memory circles = QuadrantPlacement
+            .placeRedCircles(ctx, plan);
+
+        (
+            string memory paletteColorA,
+            string memory paletteColorB,
+            string memory paletteColorC
+        ) = _palette(tokenId);
+
+        string memory result = "";
+        for (uint8 i = 0; i < circles.length; i++) {
+            uint256 seed = uint256(circles[i].x) +
+                uint256(circles[i].y) +
+                tokenId;
+
+            // Red circles: solid color, no gradient, no glitch
+            result = string.concat(
+                result,
+                circularShapes.createCircle(
+                    CircleTypes.Config({
+                        x: circles[i].x,
+                        y: circles[i].y,
+                        size: circles[i].size,
+                        seed: seed,
+                        useGradient: false,
+                        enableGlitch: false
+                    }),
+                    // OLD COLORS (commented out):
+                    // "#FF4444", // red color
+                    // "#FFAA44"  // amber color (unused for solid)
+
+                    // NEW PALETTE-BASED COLORS:
+                    paletteColorA, // first color from palette for smaller circles
+                    paletteColorA // unused for solid color
+                )
+            );
+        }
+        return result;
+    }
+
+    function _generateBlueDiamonds(
+        uint256 tokenId,
+        QuadrantPlacement.PlacementPlan memory plan
+    ) internal view returns (string memory) {
+        RandomCtx memory ctx = Random.initCtx(tokenId + 23456);
+        QuadrantPlacement.ShapeConfig[]
+            memory secondaryShapes = QuadrantPlacement.placeSecondaryCluster(
+                ctx,
+                plan
+            );
+
+        string memory result = "";
+        // Only render if secondary shape type is diamonds (type 1)
+        if (plan.secondaryShapeType == 1) {
+            for (uint8 i = 0; i < secondaryShapes.length; i++) {
+                uint256 seed = uint256(secondaryShapes[i].x) +
+                    uint256(secondaryShapes[i].y) +
+                    tokenId;
+                bool enablePulse = (seed % 4) == 0; // 25% chance of pulse
+
+                result = string.concat(
+                    result,
+                    blueDiamonds.createAnimatedDiamond(
+                        secondaryShapes[i].x,
+                        secondaryShapes[i].y,
+                        secondaryShapes[i].size,
+                        seed,
+                        enablePulse
+                    )
+                );
+            }
+        }
+        return result;
+    }
+
+    function _generateGreenSquares(
+        uint256 tokenId,
+        QuadrantPlacement.PlacementPlan memory plan
+    ) internal view returns (string memory) {
+        RandomCtx memory ctx = Random.initCtx(tokenId + 34567);
+        QuadrantPlacement.ShapeConfig[]
+            memory tertiaryShapes = QuadrantPlacement.placeTertiaryClusters(
+                ctx,
+                plan
+            );
+
+        string memory result = "";
+        // Only render if tertiary shape type is squares (type 2)
+        // Tertiary type is opposite of secondary: if secondary=1 (diamonds), tertiary=2 (squares)
+        uint8 tertiaryType = (plan.secondaryShapeType == 1) ? 2 : 1;
+        if (tertiaryType == 2) {
+            for (uint8 i = 0; i < tertiaryShapes.length; i++) {
+                uint256 seed = uint256(tertiaryShapes[i].x) +
+                    uint256(tertiaryShapes[i].y) +
+                    tokenId;
+                bool enablePulse = (seed % 3) == 0; // 33% chance of pulse
+
+                result = string.concat(
+                    result,
+                    greenSquares.createAnimatedSquare(
+                        tertiaryShapes[i].x,
+                        tertiaryShapes[i].y,
+                        tertiaryShapes[i].size,
+                        seed,
+                        enablePulse
+                    )
+                );
+            }
+        }
+        return result;
     }
 
     function _generateNeonPortals(
-        uint256 tokenId
+        uint256 tokenId,
+        string memory colorA,
+        string memory colorB
     ) internal view returns (string memory) {
         RandomCtx memory ctx = Random.initCtx(tokenId + 99999);
 
-        uint16 portalSize = MIN_PORTAL_RADIUS +
-            uint16(Random.randInt(ctx) % 601);
+        uint16 portalSize = 300 + uint16(Random.randInt(ctx) % 601); // 300-900 range
+        uint8 numPortals = 1 + uint8(Random.randInt(ctx) % 3); // 1-3 portals
 
-        uint8 numPortals = 1 + uint8(Random.randInt(ctx) % 3);
+        (
+            string memory paletteColorA,
+            string memory paletteColorB,
+            string memory paletteColorC
+        ) = _palette(tokenId);
 
         string memory result = "";
 
         for (uint8 i = 0; i < numPortals; i++) {
             (uint16 x, uint16 y) = _getSafePortalPosition(ctx, i, numPortals);
             uint256 seed = tokenId + uint256(i);
-            bool enablePulse = (seed % 3) == 0;
+            bool enableGlitch = (seed % 2) == 0; // 50% chance of glitch
 
-            uint16 centerX;
-            uint16 centerY;
+            // Neon portals: gradient, palette colors, optional glitch
+            result = string.concat(
+                result,
+                circularShapes.createCircle(
+                    CircleTypes.Config({
+                        x: x,
+                        y: y,
+                        size: portalSize,
+                        seed: seed,
+                        useGradient: true,
+                        enableGlitch: enableGlitch
+                    }),
+                    // OLD COLORS (commented out):
+                    // "#00FFFF", // cyan
+                    // "#FF00FF"  // magenta
 
-            if (numPortals == 1) {
-                centerX = x;
-                centerY = y;
-            } else if (numPortals == 2) {
-                centerX = 620;
-                centerY = 720;
-            } else {
-                centerX = 720;
-                centerY = 613;
-            }
-
-            string memory portal = neonPortal.createAnimatedNeonPortal(
-                x,
-                y,
-                portalSize,
-                seed,
-                enablePulse,
-                true, // enableMovement
-                centerX,
-                centerY
+                    // NEW PALETTE-BASED COLORS:
+                    paletteColorB, // second color from palette for big circles
+                    paletteColorC // third color from palette for big circles
+                )
             );
-
-            result = string.concat(result, portal);
         }
 
         return result;
@@ -149,150 +270,31 @@ contract OnChainArt is ERC721 {
         uint8 totalPortals
     ) internal pure returns (uint16, uint16) {
         if (totalPortals == 1) {
-            // Single portal: random position within safe bounds
             return (
                 200 + uint16(Random.randInt(ctx) % 1040),
                 200 + uint16(Random.randInt(ctx) % 1040)
             );
         } else if (totalPortals == 2) {
             if (portalIndex == 0) {
-                // First portal: left side
                 return (
                     200 + uint16(Random.randInt(ctx) % 400),
                     200 + uint16(Random.randInt(ctx) % 1040)
                 );
             } else {
-                // Second portal: right side (opposite)
                 return (
                     840 + uint16(Random.randInt(ctx) % 400),
                     200 + uint16(Random.randInt(ctx) % 1040)
                 );
             }
         } else {
-            // Three portals: predefined safe positions
             if (portalIndex == 0) {
-                return (400, 400); // Top-left area
+                return (400, 400);
             } else if (portalIndex == 1) {
-                return (1040, 400); // Top-right area
+                return (1040, 400);
             } else {
-                return (720, 1040); // Bottom center
+                return (720, 1040);
             }
         }
-    }
-
-    function _randomPositionInRadius(
-        RandomCtx memory ctx,
-        uint16 radius
-    ) internal pure returns (uint16, uint16) {
-        // Generate random angle and distance - but keep it simple
-        uint256 angle = Random.randInt(ctx) % 4; // Just 4 directions
-        uint256 distance = Random.randInt(ctx) % 300; // Max 300px from center
-
-        uint16 x;
-        uint16 y;
-
-        if (angle == 0) {
-            // Top-right
-            x = CENTER_X + uint16(distance / 2);
-            y = CENTER_Y - uint16(distance / 2);
-        } else if (angle == 1) {
-            // Bottom-right
-            x = CENTER_X + uint16(distance / 2);
-            y = CENTER_Y + uint16(distance / 2);
-        } else if (angle == 2) {
-            // Bottom-left
-            x = CENTER_X - uint16(distance / 2);
-            y = CENTER_Y + uint16(distance / 2);
-        } else {
-            // Top-left
-            x = CENTER_X - uint16(distance / 2);
-            y = CENTER_Y - uint16(distance / 2);
-        }
-
-        // Ensure bounds are safe
-        if (x < 100) x = 100;
-        if (x > 1340) x = 1340;
-        if (y < 100) y = 100;
-        if (y > 1340) y = 1340;
-
-        return (x, y);
-    }
-
-    function _getOppositeQuadrantPosition(
-        RandomCtx memory ctx,
-        uint16 x1,
-        uint16 y1
-    ) internal pure returns (uint16, uint16) {
-        // Determine which quadrant the first portal is in
-        bool rightSide = x1 > CENTER_X;
-        bool bottomSide = y1 > CENTER_Y;
-
-        // Place second portal in opposite quadrant with safe bounds
-        uint16 x2;
-        uint16 y2;
-        uint256 rand1 = Random.randInt(ctx);
-        uint256 rand2 = Random.randInt(ctx);
-
-        // Use safer range calculations to avoid underflow
-        uint16 safeRange = 620; // CENTER_X - 100 = 720 - 100 = 620
-
-        if (rightSide && !bottomSide) {
-            // First is top-right, place in bottom-left
-            x2 = 100 + uint16(rand1 % safeRange);
-            y2 = CENTER_Y + uint16(rand2 % safeRange);
-        } else if (rightSide && bottomSide) {
-            // First is bottom-right, place in top-left
-            x2 = 100 + uint16(rand1 % safeRange);
-            y2 = 100 + uint16(rand2 % safeRange);
-        } else if (!rightSide && bottomSide) {
-            // First is bottom-left, place in top-right
-            x2 = CENTER_X + uint16(rand1 % safeRange);
-            y2 = 100 + uint16(rand2 % safeRange);
-        } else {
-            // First is top-left, place in bottom-right
-            x2 = CENTER_X + uint16(rand1 % safeRange);
-            y2 = CENTER_Y + uint16(rand2 % safeRange);
-        }
-
-        // Final bounds check
-        if (x2 < 100) x2 = 100;
-        if (x2 > 1340) x2 = 1340;
-        if (y2 < 100) y2 = 100;
-        if (y2 > 1340) y2 = 1340;
-
-        return (x2, y2);
-    }
-
-    // Remove the trigonometry functions that were causing overflow
-    // Simple quadrant-based placement is more gas efficient anyway
-
-    function _generateRedCircles(
-        uint256 tokenId,
-        QuadrantPlacement.PlacementPlan memory plan
-    ) internal view returns (string memory) {
-        RandomCtx memory ctx = Random.initCtx(tokenId + 12345);
-        QuadrantPlacement.ShapeConfig[] memory circles = QuadrantPlacement
-            .placeRedCircles(ctx, plan);
-
-        string memory result = "";
-        for (uint8 i = 0; i < circles.length; i++) {
-            uint8 animationPattern = uint8((tokenId + i) % 3);
-            uint256 seed = uint256(circles[i].x) +
-                uint256(circles[i].y) +
-                tokenId;
-
-            result = string.concat(
-                result,
-                redCircles.createAnimatedCircle(
-                    circles[i].x,
-                    circles[i].y,
-                    circles[i].size,
-                    seed,
-                    animationPattern
-                )
-            );
-        }
-        return result;
     }
 
     function _generatePinkSquares(

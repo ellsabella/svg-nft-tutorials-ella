@@ -32,7 +32,8 @@ contract BasicShapes is IBasicShapes {
                 _createWideGlowLayer(x, y, size),
                 _createMediumGlowLayer(x, y, size),
                 _createCrispLayer(x, y, size),
-                _createWhiteHotLayer(x, y, size, enablePulse),
+                // _createWhiteHotLayer(x, y, size, enablePulse),
+                _createWhiteHotLayer(x, y, size, false),
                 "</g>"
             );
     }
@@ -230,8 +231,8 @@ contract BasicShapes is IBasicShapes {
                 string.concat(
                     baseRect,
                     ">",
-                    '<animate attributeName="opacity" values="0.3;0.9;0.3" dur="2.5s" repeatCount="indefinite"/>',
-                    '<animate attributeName="stroke-width" values="0.5;2;0.5" dur="2.5s" repeatCount="indefinite"/>',
+                    // '<animate attributeName="opacity" values="0.3;0.9;0.3" dur="2.5s" repeatCount="indefinite"/>',
+                    // '<animate attributeName="stroke-width" values="0.5;2;0.5" dur="2.5s" repeatCount="indefinite"/>',
                     "</rect>"
                 );
         } else {
@@ -403,8 +404,8 @@ contract BasicShapes is IBasicShapes {
                 string.concat(
                     baseLine,
                     ">",
-                    '<animate attributeName="opacity" values="0.3;0.9;0.3" dur="2.5s" repeatCount="indefinite"/>',
-                    '<animate attributeName="stroke-width" values="0.5;2;0.5" dur="2.5s" repeatCount="indefinite"/>',
+                    // '<animate attributeName="opacity" values="0.3;0.9;0.3" dur="2.5s" repeatCount="indefinite"/>',
+                    // '<animate attributeName="stroke-width" values="0.5;2;0.5" dur="2.5s" repeatCount="indefinite"/>',
                     "</line>"
                 );
         } else {
@@ -437,8 +438,8 @@ contract BasicShapes is IBasicShapes {
                 string.concat(
                     baseLine,
                     ">",
-                    '<animate attributeName="opacity" values="0.3;0.9;0.3" dur="2.5s" repeatCount="indefinite"/>',
-                    '<animate attributeName="stroke-width" values="0.5;2;0.5" dur="2.5s" repeatCount="indefinite"/>',
+                    // '<animate attributeName="opacity" values="0.3;0.9;0.3" dur="2.5s" repeatCount="indefinite"/>',
+                    // '<animate attributeName="stroke-width" values="0.5;2;0.5" dur="2.5s" repeatCount="indefinite"/>',
                     "</line>"
                 );
         } else {

@@ -82,7 +82,7 @@ contract RedCircles is IRedCircles {
         return
             string.concat(
                 baseCircle,
-                _getAnimationForPattern(x, y, size, pattern),
+                // _getAnimationForPattern(x, y, size, pattern),
                 "</circle>"
             );
     }
@@ -117,7 +117,7 @@ contract RedCircles is IRedCircles {
         return
             string.concat(
                 baseCircle,
-                _getAnimationForPattern(x, y, size, pattern),
+                // _getAnimationForPattern(x, y, size, pattern),
                 "</circle>"
             );
     }
@@ -146,7 +146,7 @@ contract RedCircles is IRedCircles {
         return
             string.concat(
                 baseCircle,
-                _getAnimationForPattern(x, y, size, pattern),
+                // _getAnimationForPattern(x, y, size, pattern),
                 "</circle>"
             );
     }
@@ -171,10 +171,10 @@ contract RedCircles is IRedCircles {
         return
             string.concat(
                 baseCircle,
-                _getAnimationForPattern(x, y, size, pattern),
+                // _getAnimationForPattern(x, y, size, pattern),
                 // Upgraded animation: both opacity and stroke-width
-                '<animate attributeName="opacity" values="0.3;0.9;0.3" dur="4s" repeatCount="indefinite"/>',
-                '<animate attributeName="stroke-width" values="1;3;1" dur="4s" repeatCount="indefinite"/>',
+                // '<animate attributeName="opacity" values="0.3;0.9;0.3" dur="4s" repeatCount="indefinite"/>',
+                // '<animate attributeName="stroke-width" values="1;3;1" dur="4s" repeatCount="indefinite"/>',
                 "</circle>"
             );
     }
