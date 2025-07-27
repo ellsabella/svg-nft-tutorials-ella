@@ -9,7 +9,8 @@ interface IGreenSquares {
         uint16 y,
         uint8 size,
         uint256 seed,
-        bool enablePulse
+        bool enablePulse,
+        string memory color
     ) external pure returns (string memory);
 }
 
@@ -19,35 +20,20 @@ contract GreenSquares is IGreenSquares {
         uint16 y,
         uint8 size,
         uint256 seed,
-        bool enablePulse
+        bool enablePulse,
+        string memory color
     ) external pure override returns (string memory) {
         // Larger minimum size for green squares with inner diamonds
         if (size < 20) size = 20;
 
         return
             string.concat(
-                _createGreenGradientDefs(),
                 "<g>",
-                _createWideGlowLayer(x, y, size),
-                _createMediumGlowLayer(x, y, size),
-                _createCrispLayer(x, y, size),
+                _createWideGlowLayer(x, y, size, color),
+                _createMediumGlowLayer(x, y, size, color),
+                _createCrispLayer(x, y, size, color),
                 _createWhiteHotLayer(x, y, size, enablePulse),
                 "</g>"
-            );
-    }
-
-    // === GRADIENT DEFINITIONS ===
-    function _createGreenGradientDefs() internal pure returns (string memory) {
-        return
-            string.concat(
-                "<defs>",
-                // Radial gradient: bright green center to lime edges
-                '<radialGradient id="greenLime" cx="0.5" cy="0.5">',
-                '<stop offset="0" stop-color="#44DD44"/>',
-                '<stop offset="0.7" stop-color="#66DD66"/>',
-                '<stop offset="1" stop-color="#88FF88"/>',
-                "</radialGradient>",
-                "</defs>"
             );
     }
 
@@ -55,7 +41,8 @@ contract GreenSquares is IGreenSquares {
     function _createWideGlowLayer(
         uint16 x,
         uint16 y,
-        uint8 size
+        uint8 size,
+        string memory color
     ) internal pure returns (string memory) {
         uint8 strokeWidth = _getStrokeWidth(size);
         uint8 wideStrokeWidth = strokeWidth;
@@ -70,8 +57,14 @@ contract GreenSquares is IGreenSquares {
         return
             string.concat(
                 "<g>",
-                _createOuterSquareWideGlow(x, y, size, wideStrokeWidth),
-                _createInnerDiamondWideGlow(x, y, innerSize, wideStrokeWidth),
+                _createOuterSquareWideGlow(x, y, size, wideStrokeWidth, color),
+                _createInnerDiamondWideGlow(
+                    x,
+                    y,
+                    innerSize,
+                    wideStrokeWidth,
+                    color
+                ),
                 "</g>"
             );
     }
@@ -80,7 +73,8 @@ contract GreenSquares is IGreenSquares {
     function _createMediumGlowLayer(
         uint16 x,
         uint16 y,
-        uint8 size
+        uint8 size,
+        string memory color
     ) internal pure returns (string memory) {
         uint8 strokeWidth = _getStrokeWidth(size);
         uint8 mediumStrokeWidth = strokeWidth;
@@ -95,12 +89,19 @@ contract GreenSquares is IGreenSquares {
         return
             string.concat(
                 "<g>",
-                _createOuterSquareMediumGlow(x, y, size, mediumStrokeWidth),
+                _createOuterSquareMediumGlow(
+                    x,
+                    y,
+                    size,
+                    mediumStrokeWidth,
+                    color
+                ),
                 _createInnerDiamondMediumGlow(
                     x,
                     y,
                     innerSize,
-                    mediumStrokeWidth
+                    mediumStrokeWidth,
+                    color
                 ),
                 "</g>"
             );
@@ -110,7 +111,8 @@ contract GreenSquares is IGreenSquares {
     function _createCrispLayer(
         uint16 x,
         uint16 y,
-        uint8 size
+        uint8 size,
+        string memory color
     ) internal pure returns (string memory) {
         uint8 strokeWidth = _getStrokeWidth(size);
         uint8 innerSize = (size * 2) / 3;
@@ -118,8 +120,8 @@ contract GreenSquares is IGreenSquares {
         return
             string.concat(
                 "<g>",
-                _createOuterSquareCrisp(x, y, size, strokeWidth),
-                _createInnerDiamondCrisp(x, y, innerSize, strokeWidth),
+                _createOuterSquareCrisp(x, y, size, strokeWidth, color),
+                _createInnerDiamondCrisp(x, y, innerSize, strokeWidth, color),
                 "</g>"
             );
     }
@@ -147,7 +149,8 @@ contract GreenSquares is IGreenSquares {
         uint16 x,
         uint16 y,
         uint8 size,
-        uint8 strokeWidth
+        uint8 strokeWidth,
+        string memory color
     ) internal pure returns (string memory) {
         uint16 halfSize = size / 2;
         return
@@ -160,7 +163,9 @@ contract GreenSquares is IGreenSquares {
                 Strings.toString(size),
                 '" height="',
                 Strings.toString(size),
-                '" fill="none" stroke="url(#greenLime)" stroke-width="',
+                '" fill="none" stroke="',
+                color,
+                '" stroke-width="',
                 Strings.toString(strokeWidth),
                 '" filter="url(#blur)" opacity="0.4"/>'
             );
@@ -170,7 +175,8 @@ contract GreenSquares is IGreenSquares {
         uint16 x,
         uint16 y,
         uint8 size,
-        uint8 strokeWidth
+        uint8 strokeWidth,
+        string memory color
     ) internal pure returns (string memory) {
         uint16 halfSize = size / 2;
         return
@@ -183,7 +189,9 @@ contract GreenSquares is IGreenSquares {
                 Strings.toString(size),
                 '" height="',
                 Strings.toString(size),
-                '" fill="none" stroke="url(#greenLime)" stroke-width="',
+                '" fill="none" stroke="',
+                color,
+                '" stroke-width="',
                 Strings.toString(strokeWidth),
                 '" filter="url(#blur)" opacity="0.7"/>'
             );
@@ -193,7 +201,8 @@ contract GreenSquares is IGreenSquares {
         uint16 x,
         uint16 y,
         uint8 size,
-        uint8 strokeWidth
+        uint8 strokeWidth,
+        string memory color
     ) internal pure returns (string memory) {
         uint16 halfSize = size / 2;
         return
@@ -206,7 +215,9 @@ contract GreenSquares is IGreenSquares {
                 Strings.toString(size),
                 '" height="',
                 Strings.toString(size),
-                '" fill="none" stroke="url(#greenLime)" stroke-width="',
+                '" fill="none" stroke="',
+                color,
+                '" stroke-width="',
                 Strings.toString(strokeWidth),
                 '"/>'
             );
@@ -237,8 +248,9 @@ contract GreenSquares is IGreenSquares {
                 string.concat(
                     baseRect,
                     ">",
-                    '<animate attributeName="opacity" values="0.3;0.7;0.3" dur="3s" repeatCount="indefinite"/>',
-                    '<animate attributeName="stroke-width" values="0.5;2;0.5" dur="3s" repeatCount="indefinite"/>',
+                    // ANIMATIONS COMMENTED OUT
+                    // '<animate attributeName="opacity" values="0.3;0.7;0.3" dur="3s" repeatCount="indefinite"/>',
+                    // '<animate attributeName="stroke-width" values="0.5;2;0.5" dur="3s" repeatCount="indefinite"/>',
                     "</rect>"
                 );
         } else {
@@ -251,7 +263,8 @@ contract GreenSquares is IGreenSquares {
         uint16 x,
         uint16 y,
         uint8 innerSize,
-        uint8 strokeWidth
+        uint8 strokeWidth,
+        string memory color
     ) internal pure returns (string memory) {
         return
             string.concat(
@@ -268,7 +281,9 @@ contract GreenSquares is IGreenSquares {
                 Strings.toString(innerSize),
                 '" height="',
                 Strings.toString(innerSize),
-                '" fill="none" stroke="url(#greenLime)" stroke-width="',
+                '" fill="none" stroke="',
+                color,
+                '" stroke-width="',
                 Strings.toString(strokeWidth),
                 '" filter="url(#blur)" opacity="0.4"/>',
                 "</g>"
@@ -279,7 +294,8 @@ contract GreenSquares is IGreenSquares {
         uint16 x,
         uint16 y,
         uint8 innerSize,
-        uint8 strokeWidth
+        uint8 strokeWidth,
+        string memory color
     ) internal pure returns (string memory) {
         return
             string.concat(
@@ -296,7 +312,9 @@ contract GreenSquares is IGreenSquares {
                 Strings.toString(innerSize),
                 '" height="',
                 Strings.toString(innerSize),
-                '" fill="none" stroke="url(#greenLime)" stroke-width="',
+                '" fill="none" stroke="',
+                color,
+                '" stroke-width="',
                 Strings.toString(strokeWidth),
                 '" filter="url(#blur)" opacity="0.6"/>',
                 "</g>"
@@ -307,7 +325,8 @@ contract GreenSquares is IGreenSquares {
         uint16 x,
         uint16 y,
         uint8 innerSize,
-        uint8 strokeWidth
+        uint8 strokeWidth,
+        string memory color
     ) internal pure returns (string memory) {
         return
             string.concat(
@@ -324,7 +343,9 @@ contract GreenSquares is IGreenSquares {
                 Strings.toString(innerSize),
                 '" height="',
                 Strings.toString(innerSize),
-                '" fill="none" stroke="url(#greenLime)" stroke-width="',
+                '" fill="none" stroke="',
+                color,
+                '" stroke-width="',
                 Strings.toString(strokeWidth),
                 '"/>',
                 "</g>"
@@ -359,8 +380,9 @@ contract GreenSquares is IGreenSquares {
                 string.concat(
                     baseDiamond,
                     ">",
-                    '<animate attributeName="opacity" values="0.3;0.7;0.3" dur="3s" repeatCount="indefinite"/>',
-                    '<animate attributeName="stroke-width" values="0.5;2;0.5" dur="3s" repeatCount="indefinite"/>',
+                    // ANIMATIONS COMMENTED OUT
+                    // '<animate attributeName="opacity" values="0.3;0.7;0.3" dur="3s" repeatCount="indefinite"/>',
+                    // '<animate attributeName="stroke-width" values="0.5;2;0.5" dur="3s" repeatCount="indefinite"/>',
                     "</rect>",
                     "</g>"
                 );

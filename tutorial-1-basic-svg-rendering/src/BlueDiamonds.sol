@@ -10,7 +10,8 @@ interface IBlueDiamonds {
         uint16 y,
         uint8 size,
         uint256 seed,
-        bool enablePulse
+        bool enablePulse,
+        string memory color
     ) external pure returns (string memory);
 }
 
@@ -20,35 +21,20 @@ contract BlueDiamonds is IBlueDiamonds {
         uint16 y,
         uint8 size,
         uint256 seed,
-        bool enablePulse
+        bool enablePulse,
+        string memory color
     ) external pure override returns (string memory) {
         // Ensure minimum size to prevent underflow
         if (size < 10) size = 10;
 
         return
             string.concat(
-                _createBlueGradientDefs(),
                 "<g>",
-                _createWideGlowLayer(x, y, size, seed),
-                _createMediumGlowLayer(x, y, size, seed),
-                _createCrispLayer(x, y, size, seed),
+                _createWideGlowLayer(x, y, size, seed, color),
+                _createMediumGlowLayer(x, y, size, seed, color),
+                _createCrispLayer(x, y, size, seed, color),
                 _createWhiteHotLayer(x, y, size, seed, enablePulse),
                 "</g>"
-            );
-    }
-
-    // === GRADIENT DEFINITIONS ===
-    function _createBlueGradientDefs() internal pure returns (string memory) {
-        return
-            string.concat(
-                "<defs>",
-                // Radial gradient: mid-blue center to cyan edges
-                '<radialGradient id="blueCyan" cx="0.5" cy="0.5">',
-                '<stop offset="0" stop-color="#66DDFF"/>',
-                '<stop offset="0.7" stop-color="#66AADD"/>',
-                '<stop offset="1" stop-color="#66DDFF"/>',
-                "</radialGradient>",
-                "</defs>"
             );
     }
 
@@ -57,7 +43,8 @@ contract BlueDiamonds is IBlueDiamonds {
         uint16 x,
         uint16 y,
         uint8 size,
-        uint256 seed
+        uint256 seed,
+        string memory color
     ) internal pure returns (string memory) {
         uint8 strokeWidth = _getStrokeWidth(size);
         uint8 wideStrokeWidth = strokeWidth;
@@ -88,7 +75,9 @@ contract BlueDiamonds is IBlueDiamonds {
                 Strings.toString(quarter),
                 " -",
                 Strings.toString(half),
-                ',0" fill="none" stroke="url(#blueCyan)" stroke-width="',
+                ',0" fill="none" stroke="',
+                color,
+                '" stroke-width="',
                 Strings.toString(wideStrokeWidth),
                 '" filter="url(#blur)" opacity="0.5"/>',
                 "</g>"
@@ -100,7 +89,8 @@ contract BlueDiamonds is IBlueDiamonds {
         uint16 x,
         uint16 y,
         uint8 size,
-        uint256 seed
+        uint256 seed,
+        string memory color
     ) internal pure returns (string memory) {
         uint8 strokeWidth = _getStrokeWidth(size);
         uint8 mediumStrokeWidth = strokeWidth;
@@ -131,7 +121,9 @@ contract BlueDiamonds is IBlueDiamonds {
                 Strings.toString(quarter),
                 " -",
                 Strings.toString(half),
-                ',0" fill="none" stroke="url(#blueCyan)" stroke-width="',
+                ',0" fill="none" stroke="',
+                color,
+                '" stroke-width="',
                 Strings.toString(mediumStrokeWidth),
                 '" filter="url(#blur)" opacity="0.7"/>',
                 "</g>"
@@ -143,7 +135,8 @@ contract BlueDiamonds is IBlueDiamonds {
         uint16 x,
         uint16 y,
         uint8 size,
-        uint256 seed
+        uint256 seed,
+        string memory color
     ) internal pure returns (string memory) {
         uint8 strokeWidth = _getStrokeWidth(size);
         string memory rotation = _getRotation(seed);
@@ -167,7 +160,9 @@ contract BlueDiamonds is IBlueDiamonds {
                 Strings.toString(quarter),
                 " -",
                 Strings.toString(half),
-                ',0" fill="none" stroke="url(#blueCyan)" stroke-width="',
+                ',0" fill="none" stroke="',
+                color,
+                '" stroke-width="',
                 Strings.toString(strokeWidth),
                 '"/>',
                 "</g>"
@@ -210,8 +205,9 @@ contract BlueDiamonds is IBlueDiamonds {
                 string.concat(
                     baseDiamond,
                     ">",
-                    '<animate attributeName="opacity" values="0.3;0.9;0.3" dur="3s" repeatCount="indefinite"/>',
-                    '<animate attributeName="stroke-width" values="0.5;2;0.5" dur="3s" repeatCount="indefinite"/>',
+                    // ANIMATIONS COMMENTED OUT
+                    // '<animate attributeName="opacity" values="0.3;0.9;0.3" dur="3s" repeatCount="indefinite"/>',
+                    // '<animate attributeName="stroke-width" values="0.5;2;0.5" dur="3s" repeatCount="indefinite"/>',
                     "</polygon>",
                     "</g>"
                 );

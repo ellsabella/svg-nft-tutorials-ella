@@ -121,7 +121,8 @@ contract OnChainArtTest is AbstractTest {
             100,
             50,
             12345,
-            false // no pulse
+            false, // no pulse
+            "#00FF00"
         );
         require(bytes(diamond).length > 0, "Blue diamond should render");
 
@@ -130,7 +131,8 @@ contract OnChainArtTest is AbstractTest {
             200,
             50,
             12345,
-            true // with pulse (animations disabled)
+            true, // with pulse (animations disabled)
+            "#FF00FF"
         );
         require(
             bytes(pulsingDiamond).length > 0,
@@ -144,7 +146,8 @@ contract OnChainArtTest is AbstractTest {
             100,
             50,
             12345,
-            false // no pulse
+            false, // no pulse
+            "#00FF00"
         );
         require(bytes(square).length > 0, "Green square should render");
 
@@ -153,7 +156,8 @@ contract OnChainArtTest is AbstractTest {
             200,
             50,
             12345,
-            true // with pulse (animations disabled)
+            true, // with pulse (animations disabled)
+            "#FF00FF"
         );
         require(
             bytes(pulsingSquare).length > 0,
@@ -166,7 +170,8 @@ contract OnChainArtTest is AbstractTest {
             100,
             100,
             50,
-            12345
+            12345,
+            "#FF0000"
         );
         require(bytes(crossSquare).length > 0, "Cross square should render");
     }

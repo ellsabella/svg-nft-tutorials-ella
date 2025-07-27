@@ -57,8 +57,8 @@ contract OnChainArt is ERC721 {
                 filters,
                 textStyle,
                 background,
-                frames,
                 shapes,
+                frames,
                 "</svg>"
             );
     }
@@ -154,26 +154,32 @@ contract OnChainArt is ERC721 {
                 plan
             );
 
-        string memory result = "";
-        // Only render if secondary shape type is diamonds (type 1)
-        if (plan.secondaryShapeType == 1) {
-            for (uint8 i = 0; i < secondaryShapes.length; i++) {
-                uint256 seed = uint256(secondaryShapes[i].x) +
-                    uint256(secondaryShapes[i].y) +
-                    tokenId;
-                bool enablePulse = (seed % 4) == 0; // 25% chance of pulse
+        // EXTRACT PALETTE COLORS HERE (at function level)
+        (
+            string memory paletteColorA,
+            string memory paletteColorB,
+            string memory paletteColorC
+        ) = _palette(tokenId);
 
-                result = string.concat(
-                    result,
-                    blueDiamonds.createAnimatedDiamond(
-                        secondaryShapes[i].x,
-                        secondaryShapes[i].y,
-                        secondaryShapes[i].size,
-                        seed,
-                        enablePulse
-                    )
-                );
-            }
+        string memory result = "";
+
+        for (uint8 i = 0; i < secondaryShapes.length; i++) {
+            uint256 seed = uint256(secondaryShapes[i].x) +
+                uint256(secondaryShapes[i].y) +
+                tokenId;
+            bool enablePulse = (seed % 4) == 0;
+
+            result = string.concat(
+                result,
+                blueDiamonds.createAnimatedDiamond(
+                    secondaryShapes[i].x,
+                    secondaryShapes[i].y,
+                    secondaryShapes[i].size,
+                    seed,
+                    enablePulse,
+                    paletteColorA // NOW THIS IS IN SCOPE
+                )
+            );
         }
         return result;
     }
@@ -189,28 +195,32 @@ contract OnChainArt is ERC721 {
                 plan
             );
 
-        string memory result = "";
-        // Only render if tertiary shape type is squares (type 2)
-        // Tertiary type is opposite of secondary: if secondary=1 (diamonds), tertiary=2 (squares)
-        uint8 tertiaryType = (plan.secondaryShapeType == 1) ? 2 : 1;
-        if (tertiaryType == 2) {
-            for (uint8 i = 0; i < tertiaryShapes.length; i++) {
-                uint256 seed = uint256(tertiaryShapes[i].x) +
-                    uint256(tertiaryShapes[i].y) +
-                    tokenId;
-                bool enablePulse = (seed % 3) == 0; // 33% chance of pulse
+        // EXTRACT PALETTE COLORS HERE (at function level)
+        (
+            string memory paletteColorA,
+            string memory paletteColorB,
+            string memory paletteColorC
+        ) = _palette(tokenId);
 
-                result = string.concat(
-                    result,
-                    greenSquares.createAnimatedSquare(
-                        tertiaryShapes[i].x,
-                        tertiaryShapes[i].y,
-                        tertiaryShapes[i].size,
-                        seed,
-                        enablePulse
-                    )
-                );
-            }
+        string memory result = "";
+
+        for (uint8 i = 0; i < tertiaryShapes.length; i++) {
+            uint256 seed = uint256(tertiaryShapes[i].x) +
+                uint256(tertiaryShapes[i].y) +
+                tokenId;
+            bool enablePulse = (seed % 3) == 0;
+
+            result = string.concat(
+                result,
+                greenSquares.createAnimatedSquare(
+                    tertiaryShapes[i].x,
+                    tertiaryShapes[i].y,
+                    tertiaryShapes[i].size,
+                    seed,
+                    enablePulse,
+                    paletteColorB // NOW THIS IS IN SCOPE
+                )
+            );
         }
         return result;
     }
@@ -305,6 +315,12 @@ contract OnChainArt is ERC721 {
         QuadrantPlacement.ShapeConfig[] memory pinks = QuadrantPlacement
             .placePinkSquares(ctx, plan);
 
+        (
+            string memory paletteColorA,
+            string memory paletteColorB,
+            string memory paletteColorC
+        ) = _palette(tokenId);
+
         string memory result = "";
         for (uint8 i = 0; i < pinks.length; i++) {
             uint256 seed = uint256(pinks[i].x) + uint256(pinks[i].y) + tokenId;
@@ -315,7 +331,8 @@ contract OnChainArt is ERC721 {
                     pinks[i].x,
                     pinks[i].y,
                     pinks[i].size,
-                    seed
+                    seed,
+                    paletteColorC // Pass third palette color instead of hardcoded pink
                 )
             );
         }
@@ -327,12 +344,12 @@ contract OnChainArt is ERC721 {
     ) internal view returns (string memory, string memory, string memory) {
         RandomCtx memory ctx = Random.initCtx(tokenId);
         uint256 i = Random.randInt(ctx) % 6;
-        if (i == 0) return ("#FFFF00", "#FF00FF", "#FFFF00");
+        if (i == 0) return ("#FFFF00", "#FF00FF", "#00FFFF");
         if (i == 1) return ("#FF0000", "#FFFF00", "#00FF00");
         if (i == 2) return ("#FF0000", "#00FFFF", "#FFFF00");
-        if (i == 3) return ("#FF0000", "#00FF00", "#00FF00");
+        if (i == 3) return ("#FF0000", "#00FF00", "#00FFFF");
         if (i == 4) return ("#00FFFF", "#FF00FF", "#FFFF00");
-        return ("#00FFFF", "#00FF00", "#FF00FF");
+        return ("#00FF00", "#00FFFF", "#FF00FF");
     }
 
     function renderSVG(uint256 id) external view returns (string memory) {
