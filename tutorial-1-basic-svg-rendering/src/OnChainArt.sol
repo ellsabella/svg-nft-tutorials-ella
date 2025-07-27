@@ -82,9 +82,13 @@ contract OnChainArt is ERC721 {
             colorA,
             colorB
         );
-        string memory pinkSquares = _generatePinkSquares(tokenId, plan);
         string memory blueDiamonds = _generateBlueDiamonds(tokenId, plan);
-        string memory greenSquares = _generateGreenSquares(tokenId, plan);
+
+        // Generate squares with collision detection
+        (
+            string memory greenSquares,
+            string memory pinkSquares
+        ) = _generateSquaresWithCollision(tokenId, plan);
 
         return
             string.concat(
@@ -94,6 +98,95 @@ contract OnChainArt is ERC721 {
                 blueDiamonds,
                 greenSquares
             );
+    }
+
+    function _generateSquaresWithCollision(
+        uint256 tokenId,
+        QuadrantPlacement.PlacementPlan memory plan
+    ) internal view returns (string memory, string memory) {
+        // Place tertiary shapes (green squares) and get collision state
+        RandomCtx memory ctx1 = Random.initCtx(tokenId + 34567);
+        (
+            QuadrantPlacement.ShapeConfig[] memory tertiaryShapes,
+            QuadrantPlacement.PlacedSquares memory collisionState
+        ) = QuadrantPlacement.placeTertiaryClusters(ctx1, plan);
+
+        string memory greenSquares = _renderGreenSquares(
+            tertiaryShapes,
+            tokenId
+        );
+
+        // Place pink squares with knowledge of green square positions
+        RandomCtx memory ctx2 = Random.initCtx(tokenId + 45678);
+        QuadrantPlacement.ShapeConfig[] memory pinkShapes = QuadrantPlacement
+            .placePinkSquares(ctx2, plan, collisionState);
+
+        string memory pinkSquares = _renderPinkSquares(pinkShapes, tokenId);
+
+        return (greenSquares, pinkSquares);
+    }
+
+    function _renderGreenSquares(
+        QuadrantPlacement.ShapeConfig[] memory shapes,
+        uint256 tokenId
+    ) internal view returns (string memory) {
+        (
+            string memory paletteColorA,
+            string memory paletteColorB,
+            string memory paletteColorC
+        ) = _palette(tokenId);
+
+        string memory result = "";
+
+        for (uint8 i = 0; i < shapes.length; i++) {
+            uint256 seed = uint256(shapes[i].x) +
+                uint256(shapes[i].y) +
+                tokenId;
+            bool enablePulse = (seed % 3) == 0;
+
+            result = string.concat(
+                result,
+                greenSquares.createAnimatedSquare(
+                    shapes[i].x,
+                    shapes[i].y,
+                    shapes[i].size,
+                    seed,
+                    enablePulse,
+                    paletteColorB
+                )
+            );
+        }
+        return result;
+    }
+
+    function _renderPinkSquares(
+        QuadrantPlacement.ShapeConfig[] memory shapes,
+        uint256 tokenId
+    ) internal view returns (string memory) {
+        (
+            string memory paletteColorA,
+            string memory paletteColorB,
+            string memory paletteColorC
+        ) = _palette(tokenId);
+
+        string memory result = "";
+        for (uint8 i = 0; i < shapes.length; i++) {
+            uint256 seed = uint256(shapes[i].x) +
+                uint256(shapes[i].y) +
+                tokenId;
+
+            result = string.concat(
+                result,
+                basicShapes.createCrossSquare(
+                    shapes[i].x,
+                    shapes[i].y,
+                    shapes[i].size,
+                    seed,
+                    paletteColorC
+                )
+            );
+        }
+        return result;
     }
 
     function _generateRedCircles(
@@ -130,11 +223,6 @@ contract OnChainArt is ERC721 {
                         useGradient: false,
                         enableGlitch: false
                     }),
-                    // OLD COLORS (commented out):
-                    // "#FF4444", // red color
-                    // "#FFAA44"  // amber color (unused for solid)
-
-                    // NEW PALETTE-BASED COLORS:
                     paletteColorA, // first color from palette for smaller circles
                     paletteColorA // unused for solid color
                 )
@@ -154,7 +242,6 @@ contract OnChainArt is ERC721 {
                 plan
             );
 
-        // EXTRACT PALETTE COLORS HERE (at function level)
         (
             string memory paletteColorA,
             string memory paletteColorB,
@@ -177,48 +264,7 @@ contract OnChainArt is ERC721 {
                     secondaryShapes[i].size,
                     seed,
                     enablePulse,
-                    paletteColorA // NOW THIS IS IN SCOPE
-                )
-            );
-        }
-        return result;
-    }
-
-    function _generateGreenSquares(
-        uint256 tokenId,
-        QuadrantPlacement.PlacementPlan memory plan
-    ) internal view returns (string memory) {
-        RandomCtx memory ctx = Random.initCtx(tokenId + 34567);
-        QuadrantPlacement.ShapeConfig[]
-            memory tertiaryShapes = QuadrantPlacement.placeTertiaryClusters(
-                ctx,
-                plan
-            );
-
-        // EXTRACT PALETTE COLORS HERE (at function level)
-        (
-            string memory paletteColorA,
-            string memory paletteColorB,
-            string memory paletteColorC
-        ) = _palette(tokenId);
-
-        string memory result = "";
-
-        for (uint8 i = 0; i < tertiaryShapes.length; i++) {
-            uint256 seed = uint256(tertiaryShapes[i].x) +
-                uint256(tertiaryShapes[i].y) +
-                tokenId;
-            bool enablePulse = (seed % 3) == 0;
-
-            result = string.concat(
-                result,
-                greenSquares.createAnimatedSquare(
-                    tertiaryShapes[i].x,
-                    tertiaryShapes[i].y,
-                    tertiaryShapes[i].size,
-                    seed,
-                    enablePulse,
-                    paletteColorB // NOW THIS IS IN SCOPE
+                    paletteColorA
                 )
             );
         }
@@ -260,11 +306,6 @@ contract OnChainArt is ERC721 {
                         useGradient: true,
                         enableGlitch: enableGlitch
                     }),
-                    // OLD COLORS (commented out):
-                    // "#00FFFF", // cyan
-                    // "#FF00FF"  // magenta
-
-                    // NEW PALETTE-BASED COLORS:
                     paletteColorB, // second color from palette for big circles
                     paletteColorC // third color from palette for big circles
                 )
@@ -305,38 +346,6 @@ contract OnChainArt is ERC721 {
                 return (720, 1040);
             }
         }
-    }
-
-    function _generatePinkSquares(
-        uint256 tokenId,
-        QuadrantPlacement.PlacementPlan memory plan
-    ) internal view returns (string memory) {
-        RandomCtx memory ctx = Random.initCtx(tokenId + 45678);
-        QuadrantPlacement.ShapeConfig[] memory pinks = QuadrantPlacement
-            .placePinkSquares(ctx, plan);
-
-        (
-            string memory paletteColorA,
-            string memory paletteColorB,
-            string memory paletteColorC
-        ) = _palette(tokenId);
-
-        string memory result = "";
-        for (uint8 i = 0; i < pinks.length; i++) {
-            uint256 seed = uint256(pinks[i].x) + uint256(pinks[i].y) + tokenId;
-
-            result = string.concat(
-                result,
-                basicShapes.createCrossSquare(
-                    pinks[i].x,
-                    pinks[i].y,
-                    pinks[i].size,
-                    seed,
-                    paletteColorC // Pass third palette color instead of hardcoded pink
-                )
-            );
-        }
-        return result;
     }
 
     function _palette(

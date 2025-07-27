@@ -3,7 +3,7 @@ pragma solidity ^0.8.26;
 
 import {Random, RandomCtx} from "./utils/Random.sol";
 
-// Quadrant-based placement system - ULTRA SIMPLIFIED
+// Simplified collision detection using coordinate lists instead of grid arrays
 library QuadrantPlacement {
     struct ShapeConfig {
         uint16 x;
@@ -21,6 +21,14 @@ library QuadrantPlacement {
         uint8 tertiaryCount1;
         uint8 tertiaryCount2;
         uint8 pinkSquareCount;
+    }
+
+    // Simple collision tracking with coordinate arrays (max 20 squares total)
+    struct PlacedSquares {
+        uint16[20] x;
+        uint16[20] y;
+        uint8[20] size;
+        uint8 count;
     }
 
     function generatePlacementPlan(
@@ -76,10 +84,13 @@ library QuadrantPlacement {
     function placeTertiaryClusters(
         RandomCtx memory ctx,
         PlacementPlan memory plan
-    ) internal pure returns (ShapeConfig[] memory) {
+    ) internal pure returns (ShapeConfig[] memory, PlacedSquares memory) {
         uint8 totalCount = plan.tertiaryCount1 + plan.tertiaryCount2;
         ShapeConfig[] memory tertiary = new ShapeConfig[](totalCount);
         uint8 tertiaryType = (plan.secondaryShapeType == 1) ? 2 : 1;
+
+        // Initialize collision tracking
+        PlacedSquares memory placed;
 
         (uint8 empty1, uint8 empty2) = _getEmptyQuadrants(
             plan.redCircleQuadrant
@@ -87,38 +98,205 @@ library QuadrantPlacement {
 
         uint8 index = 0;
 
-        // Fill first quadrant
+        // Fill first quadrant (Green squares with collision detection)
         for (uint8 i = 0; i < plan.tertiaryCount1; i++) {
-            tertiary[index] = _createTertiaryShape(ctx, empty1, tertiaryType);
-            index++;
+            ShapeConfig memory shape = _createTertiaryShapeWithCollision(
+                ctx,
+                empty1,
+                tertiaryType,
+                placed
+            );
+            if (shape.size > 0) {
+                // Only add if placement succeeded
+                tertiary[index] = shape;
+                index++;
+            }
         }
 
-        // Fill second quadrant
+        // Fill second quadrant (Green squares with collision detection)
         for (uint8 i = 0; i < plan.tertiaryCount2; i++) {
-            tertiary[index] = _createTertiaryShape(ctx, empty2, tertiaryType);
-            index++;
+            ShapeConfig memory shape = _createTertiaryShapeWithCollision(
+                ctx,
+                empty2,
+                tertiaryType,
+                placed
+            );
+            if (shape.size > 0) {
+                // Only add if placement succeeded
+                tertiary[index] = shape;
+                index++;
+            }
         }
 
-        return tertiary;
+        // Resize array to actual placed count
+        ShapeConfig[] memory result = new ShapeConfig[](index);
+        for (uint8 i = 0; i < index; i++) {
+            result[i] = tertiary[i];
+        }
+
+        return (result, placed); // Return both shapes and collision state
     }
 
     function placePinkSquares(
         RandomCtx memory ctx,
-        PlacementPlan memory plan
+        PlacementPlan memory plan,
+        PlacedSquares memory existingPlaced // Accept existing collision state
     ) internal pure returns (ShapeConfig[] memory) {
         ShapeConfig[] memory pinks = new ShapeConfig[](plan.pinkSquareCount);
 
+        uint8 actualCount = 0;
         for (uint8 i = 0; i < plan.pinkSquareCount; i++) {
             uint8 quadrant = _selectPinkQuadrant(ctx, plan.redCircleQuadrant);
-            pinks[i] = _createPinkSquare(ctx, quadrant);
+            ShapeConfig memory shape = _createPinkSquareWithCollision(
+                ctx,
+                quadrant,
+                existingPlaced
+            );
+            if (shape.size > 0) {
+                // Only add if placement succeeded
+                pinks[actualCount] = shape;
+                actualCount++;
+            }
         }
 
-        return pinks;
+        // Resize array to actual placed count
+        ShapeConfig[] memory result = new ShapeConfig[](actualCount);
+        for (uint8 i = 0; i < actualCount; i++) {
+            result[i] = pinks[i];
+        }
+
+        return result;
     }
 
-    // ULTRA SIMPLIFIED SHAPE CREATORS
+    // Overloaded version: placePinkSquares without existing collision state (creates empty state)
+    function placePinkSquares(
+        RandomCtx memory ctx,
+        PlacementPlan memory plan
+    ) internal pure returns (ShapeConfig[] memory) {
+        PlacedSquares memory emptyPlaced; // Start with empty collision state
+        return placePinkSquares(ctx, plan, emptyPlaced);
+    }
 
-    // 1. RED CIRCLES - In _createRedCircle function:
+    // COLLISION-AWARE SHAPE CREATORS
+
+    function _createTertiaryShapeWithCollision(
+        RandomCtx memory ctx,
+        uint8 quadrant,
+        uint8 shapeType,
+        PlacedSquares memory placed
+    ) private pure returns (ShapeConfig memory) {
+        uint8 attempts = 10; // Try up to 10 positions
+
+        for (uint8 attempt = 0; attempt < attempts; attempt++) {
+            uint256 r1 = Random.randInt(ctx);
+            uint256 r2 = Random.randInt(ctx);
+
+            uint16 x = _getQuadX(quadrant) + uint16(r1 % 520);
+            uint16 y = _getQuadY(quadrant) + uint16(r2 % 520);
+            uint8 size = 90; // Fixed size for green squares
+
+            if (_canPlaceSquare(placed, x, y, size)) {
+                _addPlacedSquare(placed, x, y, size);
+                return
+                    ShapeConfig({
+                        x: x,
+                        y: y,
+                        size: size,
+                        quadrant: quadrant,
+                        shapeType: shapeType
+                    });
+            }
+        }
+
+        // Return empty config if couldn't place
+        return ShapeConfig({x: 0, y: 0, size: 0, quadrant: 0, shapeType: 0});
+    }
+
+    function _createPinkSquareWithCollision(
+        RandomCtx memory ctx,
+        uint8 quadrant,
+        PlacedSquares memory placed
+    ) private pure returns (ShapeConfig memory) {
+        uint8 attempts = 10; // Try up to 10 positions
+
+        for (uint8 attempt = 0; attempt < attempts; attempt++) {
+            uint256 r1 = Random.randInt(ctx);
+            uint256 r2 = Random.randInt(ctx);
+
+            uint16 x = _getQuadX(quadrant) + uint16(r1 % 500);
+            uint16 y = _getQuadY(quadrant) + uint16(r2 % 500);
+            uint8 size = 60; // Fixed size for pink squares
+
+            if (_canPlaceSquare(placed, x, y, size)) {
+                _addPlacedSquare(placed, x, y, size);
+                return
+                    ShapeConfig({
+                        x: x,
+                        y: y,
+                        size: size,
+                        quadrant: quadrant,
+                        shapeType: 3
+                    });
+            }
+        }
+
+        // Return empty config if couldn't place
+        return ShapeConfig({x: 0, y: 0, size: 0, quadrant: 0, shapeType: 0});
+    }
+
+    // SIMPLE COLLISION DETECTION
+
+    function _canPlaceSquare(
+        PlacedSquares memory placed,
+        uint16 newX,
+        uint16 newY,
+        uint8 newSize
+    ) private pure returns (bool) {
+        uint16 halfNew = newSize / 2;
+
+        for (uint8 i = 0; i < placed.count; i++) {
+            uint16 existingX = placed.x[i];
+            uint16 existingY = placed.y[i];
+            uint8 existingSize = placed.size[i];
+            uint16 halfExisting = existingSize / 2;
+
+            // Check if rectangles overlap (center-based collision)
+            uint16 minDistance = halfNew + halfExisting;
+
+            // Use safe distance comparison to avoid underflow
+            bool xOverlap = (newX > existingX)
+                ? (newX - existingX < minDistance)
+                : (existingX - newX < minDistance);
+
+            bool yOverlap = (newY > existingY)
+                ? (newY - existingY < minDistance)
+                : (existingY - newY < minDistance);
+
+            if (xOverlap && yOverlap) {
+                return false; // Collision detected
+            }
+        }
+
+        return true; // No collision
+    }
+
+    function _addPlacedSquare(
+        PlacedSquares memory placed,
+        uint16 x,
+        uint16 y,
+        uint8 size
+    ) private pure {
+        if (placed.count < 20) {
+            // Safety check
+            placed.x[placed.count] = x;
+            placed.y[placed.count] = y;
+            placed.size[placed.count] = size;
+            placed.count++;
+        }
+    }
+
+    // ORIGINAL SHAPE CREATORS (unchanged)
+
     function _createRedCircle(
         RandomCtx memory ctx,
         uint8 quadrant
@@ -131,13 +309,12 @@ library QuadrantPlacement {
             ShapeConfig({
                 x: _getQuadX(quadrant) + uint16(r1 % 480),
                 y: _getQuadY(quadrant) + uint16(r2 % 480),
-                size: 65 + uint8(r3 % 40), // CHANGED: was 50 + (r3 % 31), now 65 + (r3 % 40) = 65-104 (was 50-80)
+                size: 65 + uint8(r3 % 40), // 65-104
                 quadrant: quadrant,
                 shapeType: 0
             });
     }
 
-    // 2. SECONDARY SHAPES (diamonds/squares) - In _createSecondaryShape function:
     function _createSecondaryShape(
         RandomCtx memory ctx,
         uint8 quadrant,
@@ -151,52 +328,13 @@ library QuadrantPlacement {
             ShapeConfig({
                 x: _getQuadX(quadrant) + uint16(r1 % 500),
                 y: _getQuadY(quadrant) + uint16(r2 % 500),
-                size: 39 + uint8(r3 % 40), // CHANGED: was 30 + (r3 % 31), now 39 + (r3 % 40) = 39-78 (was 30-60)
+                size: 39 + uint8(r3 % 40), // 39-78
                 quadrant: quadrant,
                 shapeType: shapeType
             });
     }
 
-    // 3. TERTIARY SHAPES - In _createTertiaryShape function:
-    function _createTertiaryShape(
-        RandomCtx memory ctx,
-        uint8 quadrant,
-        uint8 shapeType
-    ) private pure returns (ShapeConfig memory) {
-        uint256 r1 = Random.randInt(ctx);
-        uint256 r2 = Random.randInt(ctx);
-        uint256 r3 = Random.randInt(ctx);
-
-        return
-            ShapeConfig({
-                x: _getQuadX(quadrant) + uint16(r1 % 520),
-                y: _getQuadY(quadrant) + uint16(r2 % 520),
-                size: 46 + uint8(r3 % 34), // CHANGED: was 35 + (r3 % 26), now 46 + (r3 % 34) = 46-79 (was 35-60)
-                quadrant: quadrant,
-                shapeType: shapeType
-            });
-    }
-
-    // 4. PINK SQUARES - In _createPinkSquare function:
-    function _createPinkSquare(
-        RandomCtx memory ctx,
-        uint8 quadrant
-    ) private pure returns (ShapeConfig memory) {
-        uint256 r1 = Random.randInt(ctx);
-        uint256 r2 = Random.randInt(ctx);
-        uint256 r3 = Random.randInt(ctx);
-
-        return
-            ShapeConfig({
-                x: _getQuadX(quadrant) + uint16(r1 % 500),
-                y: _getQuadY(quadrant) + uint16(r2 % 500),
-                size: 52 + uint8(r3 % 27), // CHANGED: was 40 + (r3 % 21), now 52 + (r3 % 27) = 52-78 (was 40-60)
-                quadrant: quadrant,
-                shapeType: 3
-            });
-    }
-
-    // MINIMAL UTILITY FUNCTIONS
+    // UTILITY FUNCTIONS (unchanged)
     function _getQuadX(uint8 quadrant) private pure returns (uint16) {
         return (quadrant == 1 || quadrant == 3) ? 720 : 120;
     }
